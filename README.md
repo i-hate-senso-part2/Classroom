@@ -56,6 +56,28 @@ Run the server
 pnpm start
 ```
 
+### Browser Settings
+
+Generate a salted password hash locally:
+
+```
+pnpm hash-admin-password
+```
+
+The command prompts for a password and prints an `ADMIN_PASSWORD_HASH` value. For local development, put that value in the ignored `.env.local` file:
+
+```
+ADMIN_PASSWORD_HASH=scrypt:<salt-hex>:<hash-hex>
+```
+
+Vercel does not use a committed `.env` file for deployment. In the Vercel project, open **Settings > Environment Variables**, add `ADMIN_PASSWORD_HASH` with the generated value for the required environments, then redeploy. The server also reads `.env.local` and `.env` locally through dotenv; Vercel-provided variables take precedence.
+
+There is no default admin password. The admin panel stays disabled unless the hash is valid. The admin panel opens after the Up, Down, Up, Down arrow sequence. The blocked setting is stored locally in the ignored `data/browser-state.json` file. Admin sessions use an HTTP-only cookie and expire after eight hours.
+
+The browser theme preference is stored per browser. Tab cloaking changes the selected tab's displayed name and icon; it does not disguise network traffic or browser activity from the server or device administrator.
+
+Homepage links, search engines, and tab-cloaker presets use local images from `public/logos`. Add a `.png` or `.webp` image there, then set its path in the matching `logo` field in `public/index.js`, for example `logo: "/logos/tiktok.png"`. The browser does not require a particular image extension.
+
 Resources for self-hosting:
 
 - https://github.com/nvm-sh/nvm

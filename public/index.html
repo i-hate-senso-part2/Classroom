@@ -1,47 +1,281 @@
 <!doctype html>
-<html>
+<html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<meta
 			name="viewport"
 			content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
 		/>
-		<title>Home - Classroom</title>
-
-		<link rel="shortcut icon" content="favicon.webp" />
-	
+		<title>Classroom</title>
+		<link id="browser-favicon" rel="icon" href="/sj.png" />
+		<link rel="stylesheet" href="browser.css" />
 		<script src="/scram/scramjet.all.js"></script>
 		<script src="/baremux/index.js"></script>
-		
-		<link rel="stylesheet" href="index.css" />
 		<script src="register-sw.js" defer></script>
 		<script src="search.js" defer></script>
 		<script src="index.js" defer></script>
-		<script type="module" src="speed-insights.js"></script>
 	</head>
 
 	<body>
-		<div title="Scramjet Logo" class="flex-center logo-wrapper header-center">
-			<img class="logo" src="sj.png" alt="Scramjet" />
-			<h1>stop leaking the link</h1>
-		</div>
-		
-		<div class="flex-center desc left-margin">
-			<!-- The text here will automatically be replaced by your javascript array -->
-			<p id="dynamic-subtitle">Loading...</p>
-		</div>
+		<div class="browser-app">
+			<header class="browser-chrome">
+				<div class="tab-row">
+					<div
+						id="tab-list"
+						class="tab-list"
+						role="tablist"
+						aria-label="Open tabs"
+					></div>
+					<button
+						id="new-tab"
+						class="icon-button new-tab-button"
+						type="button"
+						title="New tab (Ctrl+T)"
+						aria-label="New tab"
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M12 5v14M5 12h14" />
+						</svg>
+					</button>
+				</div>
+				<div class="toolbar-row">
+					<nav class="navigation-controls" aria-label="Page navigation">
+						<button
+							id="go-back"
+							class="icon-button"
+							type="button"
+							title="Back (Alt+Left)"
+							aria-label="Back"
+							disabled
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="m14.5 5-7 7 7 7" />
+							</svg>
+						</button>
+						<button
+							id="go-forward"
+							class="icon-button"
+							type="button"
+							title="Forward (Alt+Right)"
+							aria-label="Forward"
+							disabled
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="m9.5 5 7 7-7 7" />
+							</svg>
+						</button>
+						<button
+							id="reload-page"
+							class="icon-button"
+							type="button"
+							title="Reload (Ctrl+R)"
+							aria-label="Reload"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									d="M20 7v5h-5M4.6 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.4 3a7.5 7.5 0 0 1-12.7 2L4 12"
+								/>
+							</svg>
+						</button>
+						<button
+							id="go-home"
+							class="icon-button"
+							type="button"
+							title="Home"
+							aria-label="Home"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="m3.5 10 8.5-7 8.5 7M5.5 9v11h13V9M9.5 20v-6h5v6" />
+							</svg>
+						</button>
+					</nav>
+					<form id="sj-form" class="address-form" autocomplete="off">
+						<input
+							id="sj-search-engine"
+							type="hidden"
+							value="https://www.google.com/search?q=%s"
+						/>
+						<span class="address-symbol" aria-hidden="true">
+							<svg viewBox="0 0 24 24">
+								<rect x="5" y="10" width="14" height="11" rx="2" />
+								<path d="M8 10V7a4 4 0 0 1 8 0v3" />
+							</svg>
+						</span>
+						<input
+							id="sj-address"
+							type="text"
+							placeholder="Search or enter an address"
+							autocapitalize="off"
+							autocorrect="off"
+							spellcheck="false"
+							aria-label="Search or enter an address"
+						/>
+						<div class="engine-picker" aria-label="Search engine selector">
+							<button
+								type="button"
+								class="engine-trigger engine-button active"
+								data-engine="google"
+								aria-label="Use Google search"
+								aria-expanded="false"
+								title="Google"
+							></button>
+							<div
+								class="engine-menu"
+								role="menu"
+								aria-label="Engine options"
+							></div>
+						</div>
+						<button
+							id="save-bookmark"
+							class="icon-button bookmark-button"
+							type="button"
+							title="Bookmark this page"
+							aria-label="Bookmark this page"
+							aria-pressed="false"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"
+								/>
+							</svg>
+						</button>
+						<div class="cloak-control">
+							<button
+								id="cloak-open"
+								class="icon-button"
+								type="button"
+								title="Change tab appearance"
+								aria-label="Change tab appearance"
+								aria-expanded="false"
+							>
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<path d="M3 12s3.2-6 9-6 9 6 9 6-3.2 6-9 6-9-6-9-6Z" />
+									<circle cx="12" cy="12" r="2.5" />
+								</svg>
+							</button>
+							<div
+								id="cloak-menu"
+								class="cloak-menu"
+								role="menu"
+								aria-label="Tab appearance templates"
+								hidden
+							></div>
+						</div>
+						<button
+							id="theme-toggle"
+							class="icon-button"
+							type="button"
+							title="Switch to dark mode"
+							aria-label="Switch to dark mode"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"
+								/>
+							</svg>
+						</button>
+						<button
+							id="admin-open"
+							class="icon-button"
+							type="button"
+							title="Administrator settings"
+							aria-label="Administrator settings"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									d="M12 3 20 6v5c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10V6l8-3Z"
+								/>
+								<path d="m9 12 2 2 4-4" />
+							</svg>
+						</button>
+					</form>
+				</div>
+				<div id="browser-progress" class="browser-progress" aria-hidden="true">
+					<span></span>
+				</div>
+			</header>
 
-		<form id="sj-form" class="flex-center">
-			<input
-				id="sj-search-engine"
-				value="https://google.com"
-				type="hidden"
-			/>
-			<input id="sj-address" type="text" placeholder="yellow copy" />
-		</form>
-		
-		<div class="desc left-margin">
-			<p id="sj-error"></p>
-			<pre id="sj-error-code"></pre>
+			<main id="browser-stage" class="browser-stage">
+				<section id="home-screen" class="home-screen" aria-label="New tab">
+					<div class="home-content">
+						<div class="home-brand">
+							<img src="sj.png" alt="" />
+							<div>
+								<span class="home-kicker">YOUR SPACE</span>
+								<h1>Classroom</h1>
+							</div>
+						</div>
+						<p class="home-prompt">Where to today?</p>
+						<div
+							id="quick-links"
+							class="quick-links"
+							aria-label="Bookmarks and shortcuts"
+						></div>
+					</div>
+				</section>
+				<div id="frame-host" class="frame-host"></div>
+				<div class="status-block" aria-live="polite">
+					<p id="sj-error"></p>
+					<pre id="sj-error-code"></pre>
+				</div>
+			</main>
 		</div>
-		
+		<dialog
+			id="admin-dialog"
+			class="utility-dialog"
+			aria-labelledby="admin-title"
+		>
+			<div class="dialog-heading">
+				<div>
+					<span class="dialog-kicker">CONTROL ROOM</span>
+					<h2 id="admin-title">Administrator</h2>
+				</div>
+				<button
+					id="admin-close"
+					class="icon-button"
+					type="button"
+					aria-label="Close administrator settings"
+					title="Close"
+				>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<path d="m6 6 12 12M18 6 6 18" />
+					</svg>
+				</button>
+			</div>
+			<form id="admin-login-form">
+				<label for="admin-password">Admin password</label>
+				<input
+					id="admin-password"
+					type="password"
+					autocomplete="current-password"
+					required
+				/>
+				<button class="dialog-primary" type="submit">Sign in</button>
+			</form>
+			<section id="admin-settings" hidden>
+				<label class="setting-row" for="blocked-toggle"
+					><span
+						><strong>Blocked</strong
+						><small>Show the restriction screen to all visitors</small></span
+					><input id="blocked-toggle" type="checkbox"
+				/></label>
+				<button id="admin-logout" class="dialog-secondary" type="button">
+					Sign out
+				</button>
+			</section>
+			<p id="admin-message" class="dialog-message" aria-live="polite"></p>
+		</dialog>
+		<section
+			id="blocked-overlay"
+			class="blocked-overlay"
+			role="alert"
+			aria-label="Access restricted"
+			hidden
+		>
+			<img
+				src="/blocked.png"
+				alt="Access restricted. This website has been blocked by your administrator."
+			/>
+		</section>
+	</body>
+</html>
