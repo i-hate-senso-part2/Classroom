@@ -72,7 +72,9 @@ ADMIN_PASSWORD_HASH=scrypt:<salt-hex>:<hash-hex>
 
 Vercel does not use a committed `.env` file for deployment. In the Vercel project, open **Settings > Environment Variables**, add `ADMIN_PASSWORD_HASH` with the generated value for the required environments, then redeploy. The server also reads `.env.local` and `.env` locally through dotenv; Vercel-provided variables take precedence.
 
-There is no default admin password. The admin panel stays disabled unless the hash is valid. The admin panel opens after the Up, Down, Up, Down arrow sequence. The blocked setting is stored locally in the ignored `data/browser-state.json` file. Admin sessions use an HTTP-only cookie and expire after eight hours.
+There is no default admin password. The admin panel stays disabled unless the hash is valid. The admin panel opens after the Up, Down, Up, Down arrow sequence. Admin sessions use a signed HTTP-only cookie and expire after eight hours.
+
+For local development, the blocked setting is stored in the ignored `data/browser-state.json` file. Vercel functions have ephemeral filesystems, so connect an Upstash Redis database to the Vercel project and configure `KV_REST_API_URL` and `KV_REST_API_TOKEN` in **Settings > Environment Variables**. The compatible aliases `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are also accepted. Redeploy after adding them. Without a KV store, the Vercel API returns a configuration error instead of silently losing blocked state.
 
 The browser theme preference is stored per browser. Tab cloaking changes the selected tab's displayed name and icon; it does not disguise network traffic or browser activity from the server or device administrator.
 

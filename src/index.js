@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
-import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
@@ -34,7 +34,12 @@ const adminPasswordConfig =
 			}
 		: null;
 const scryptAsync = promisify(scrypt);
-const adminSessions = new Map();
+const kvRestUrl =
+	process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
+const kvRestToken =
+	process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
+const hasKvConfig = Boolean(kvRestUrl && kvRestToken);
+const hasPartialKvConfig = Boolean(kvRestUrl || kvRestToken) && !hasKvConfig;
 const loginAttempts = new Map();
 const adminSessionLifetime = 8 * 60 * 60 * 1000;
 let browserState = { blocked: false };
@@ -61,26 +66,95 @@ function sessionCookieOptions(request, maxAge = adminSessionLifetime / 1000) {
 }
 
 function getAdminSession(request) {
+	if (!adminPasswordConfig) return false;
 	const cookie = (request.headers.cookie || "")
 		.split(";")
 		.map((part) => part.trim())
 		.find((part) => part.startsWith("classroom_admin="));
 	const token = cookie?.slice("classroom_admin=".length);
-	const session = token && adminSessions.get(token);
-	if (!session || session.expiresAt <= Date.now()) {
-		if (token) adminSessions.delete(token);
+	if (!token) return false;
+	const [expiresText, nonce, signature] = token.split(".");
+	if (
+		!/^\d+$/.test(expiresText) ||
+		!/^[\da-f]{32}$/i.test(nonce) ||
+		!/^[\da-f]{64}$/i.test(signature) ||
+		Number(expiresText) <= Date.now()
+	) {
 		return false;
 	}
-	return true;
+	const payload = `${expiresText}.${nonce}`;
+	const expected = createHmac("sha256", adminPasswordConfig.digest)
+		.update(payload)
+		.digest();
+	const supplied = Buffer.from(signature, "hex");
+	return timingSafeEqual(supplied, expected);
 }
 
-function persistBrowserState() {
+function createAdminSession() {
+	const expiresAt = Date.now() + adminSessionLifetime;
+	const expiresText = String(expiresAt);
+	const nonce = randomBytes(16).toString("hex");
+	const payload = `${expiresText}.${nonce}`;
+	const signature = createHmac("sha256", adminPasswordConfig.digest)
+		.update(payload)
+		.digest("hex");
+	return { token: `${payload}.${signature}`, expiresAt };
+}
+
+function assertStateStorageAvailable() {
+	if (hasPartialKvConfig) {
+		throw new Error("Configure both KV_REST_API_URL and KV_REST_API_TOKEN.");
+	}
+	if (!hasKvConfig && process.env.VERCEL) {
+		throw new Error(
+			"Vercel needs a KV store. Configure KV_REST_API_URL and KV_REST_API_TOKEN."
+		);
+	}
+}
+
+async function kvCommand(command, ...args) {
+	const response = await fetch(`${kvRestUrl.replace(/\/+$/, "")}/`, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${kvRestToken}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify([command, ...args]),
+	});
+	const payload = await response.json().catch(() => ({}));
+	if (!response.ok || payload.error) {
+		throw new Error(
+			payload.error || `KV request failed with ${response.status}.`
+		);
+	}
+	return payload.result;
+}
+
+async function readBlockedState() {
+	assertStateStorageAvailable();
+	if (!hasKvConfig) return browserState.blocked;
+	const value = await kvCommand("GET", "classroom:blocked");
+	if (value !== null && value !== "0" && value !== "1") {
+		throw new Error("Stored blocked setting is invalid.");
+	}
+	return value === "1";
+}
+
+function persistBrowserState(blocked) {
 	mkdirSync(dirname(browserStatePath), { recursive: true });
-	writeFileSync(
-		browserStatePath,
-		`${JSON.stringify(browserState, null, 2)}\n`,
-		{ mode: 0o600 }
-	);
+	writeFileSync(browserStatePath, `${JSON.stringify({ blocked }, null, 2)}\n`, {
+		mode: 0o600,
+	});
+}
+
+async function saveBlockedState(blocked) {
+	assertStateStorageAvailable();
+	if (hasKvConfig) {
+		await kvCommand("SET", "classroom:blocked", blocked ? "1" : "0");
+	} else {
+		persistBrowserState(blocked);
+	}
+	browserState.blocked = blocked;
 }
 
 async function verifyAdminPassword(password) {
@@ -117,10 +191,15 @@ const fastify = Fastify({
 	},
 });
 
-fastify.get("/api/browser-state", async (_request, reply) => {
-	return reply
-		.header("Cache-Control", "no-store")
-		.send({ blocked: browserState.blocked });
+fastify.get("/api/browser-state", async (request, reply) => {
+	try {
+		return reply
+			.header("Cache-Control", "no-store")
+			.send({ blocked: await readBlockedState() });
+	} catch (error) {
+		request.log.error(error);
+		return reply.code(503).send({ error: error.message });
+	}
 });
 
 fastify.post("/api/admin/login", async (request, reply) => {
@@ -147,12 +226,12 @@ fastify.post("/api/admin/login", async (request, reply) => {
 		return reply.code(401).send({ error: "Incorrect administrator password." });
 	}
 	loginAttempts.delete(ip);
-	const token = randomBytes(32).toString("hex");
-	adminSessions.set(token, { expiresAt: Date.now() + adminSessionLifetime });
+	const { token, expiresAt } = createAdminSession();
+	const maxAge = Math.floor((expiresAt - Date.now()) / 1000);
 	return reply
 		.header(
 			"Set-Cookie",
-			`classroom_admin=${token}; ${sessionCookieOptions(request)}`
+			`classroom_admin=${token}; ${sessionCookieOptions(request, maxAge)}`
 		)
 		.send({ authenticated: true });
 });
@@ -160,9 +239,14 @@ fastify.post("/api/admin/login", async (request, reply) => {
 fastify.get("/api/admin/state", async (request, reply) => {
 	if (!getAdminSession(request))
 		return reply.code(401).send({ error: "Admin sign-in required." });
-	return reply
-		.header("Cache-Control", "no-store")
-		.send({ blocked: browserState.blocked });
+	try {
+		return reply
+			.header("Cache-Control", "no-store")
+			.send({ blocked: await readBlockedState() });
+	} catch (error) {
+		request.log.error(error);
+		return reply.code(503).send({ error: error.message });
+	}
 });
 
 fastify.get("/api/admin/session", async (request, reply) => {
@@ -178,12 +262,11 @@ fastify.post("/api/admin/blocked", async (request, reply) => {
 	if (typeof request.body?.blocked !== "boolean") {
 		return reply.code(400).send({ error: "Blocked must be true or false." });
 	}
-	browserState.blocked = request.body.blocked;
 	try {
-		persistBrowserState();
+		await saveBlockedState(request.body.blocked);
 	} catch (error) {
 		request.log.error(error);
-		return reply.code(500).send({ error: "Could not save browser settings." });
+		return reply.code(503).send({ error: error.message });
 	}
 	return reply.send({ blocked: browserState.blocked });
 });
@@ -193,7 +276,6 @@ fastify.post("/api/admin/logout", async (request, reply) => {
 		.split(";")
 		.map((part) => part.trim())
 		.find((part) => part.startsWith("classroom_admin="));
-	if (cookie) adminSessions.delete(cookie.slice("classroom_admin=".length));
 	return reply
 		.header(
 			"Set-Cookie",

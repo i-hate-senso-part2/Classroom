@@ -678,5 +678,8 @@ document.addEventListener("keydown", (event) => {
 renderQuickLinks();
 createTab();
 refreshBlockedState();
-window.setInterval(refreshBlockedState, 15000);
+window.setInterval(refreshBlockedState, 60000);
+document.addEventListener("visibilitychange", () => {
+	if (!document.hidden) refreshBlockedState();
+});
 window.addEventListener("pagehide", () => setLoading(false));
