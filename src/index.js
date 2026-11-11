@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
 import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
@@ -11,13 +12,18 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
-import { libcurlPath } from "@mercuryworkshop/libcurl-transport";
-import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 const publicPath = fileURLToPath(new URL("../public/", import.meta.url));
+const require = createRequire(import.meta.url);
+const libcurlPath = dirname(
+	require.resolve("@mercuryworkshop/libcurl-transport")
+);
+const scramjetControllerPath = dirname(
+	require.resolve("@mercuryworkshop/scramjet-controller")
+);
 const browserStatePath = fileURLToPath(
 	new URL("../data/browser-state.json", import.meta.url)
 );
@@ -291,19 +297,19 @@ fastify.register(fastifyStatic, {
 
 fastify.register(fastifyStatic, {
 	root: scramjetPath,
-	prefix: "/scram/",
+	prefix: "/scramjet/",
+	decorateReply: false,
+});
+
+fastify.register(fastifyStatic, {
+	root: scramjetControllerPath,
+	prefix: "/scramjet-controller/",
 	decorateReply: false,
 });
 
 fastify.register(fastifyStatic, {
 	root: libcurlPath,
 	prefix: "/libcurl/",
-	decorateReply: false,
-});
-
-fastify.register(fastifyStatic, {
-	root: baremuxPath,
-	prefix: "/baremux/",
 	decorateReply: false,
 });
 

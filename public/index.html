@@ -9,8 +9,9 @@
 		<title>Classroom</title>
 		<link id="browser-favicon" rel="icon" href="/sj.png" />
 		<link rel="stylesheet" href="browser.css" />
-		<script src="/scram/scramjet.all.js"></script>
-		<script src="/baremux/index.js"></script>
+		<script src="/scramjet/scramjet.js"></script>
+		<script src="/scramjet-controller/controller.api.js"></script>
+		<script src="/libcurl/index.js"></script>
 		<script src="register-sw.js" defer></script>
 		<script src="search.js" defer></script>
 		<script src="index.js" defer></script>
@@ -37,6 +38,18 @@
 							<path d="M12 5v14M5 12h14" />
 						</svg>
 					</button>
+					<button
+						id="fullscreen-toggle"
+						class="icon-button"
+						type="button"
+						title="Enter full screen"
+						aria-label="Enter full screen"
+						aria-pressed="false"
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4" />
+						</svg>
+					</button>
 				</div>
 				<div class="toolbar-row">
 					<nav class="navigation-controls" aria-label="Page navigation">
@@ -49,7 +62,7 @@
 							disabled
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true">
-								<path d="m14.5 5-7 7 7 7" />
+								<path d="M19 12H5m7 7-7-7 7-7" />
 							</svg>
 						</button>
 						<button
@@ -61,7 +74,7 @@
 							disabled
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true">
-								<path d="m9.5 5 7 7-7 7" />
+								<path d="M5 12h14m-7-7 7 7-7 7" />
 							</svg>
 						</button>
 						<button
@@ -73,7 +86,7 @@
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true">
 								<path
-									d="M20 7v5h-5M4.6 9a7.5 7.5 0 0 1 12.7-2L20 12M4 17v-5h5m10.4 3a7.5 7.5 0 0 1-12.7 2L4 12"
+									d="M20 11a8.1 8.1 0 0 0-14.9-4L4 9m0-5v5h5m-5 4a8.1 8.1 0 0 0 14.9 4L20 15m0 5v-5h-5"
 								/>
 							</svg>
 						</button>
@@ -85,7 +98,9 @@
 							aria-label="Home"
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true">
-								<path d="m3.5 10 8.5-7 8.5 7M5.5 9v11h13V9M9.5 20v-6h5v6" />
+								<path
+									d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"
+								/>
 							</svg>
 						</button>
 					</nav>
@@ -135,43 +150,21 @@
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true">
 								<path
-									d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"
+									d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z"
 								/>
 							</svg>
 						</button>
-						<div class="cloak-control">
-							<button
-								id="cloak-open"
-								class="icon-button"
-								type="button"
-								title="Change tab appearance"
-								aria-label="Change tab appearance"
-								aria-expanded="false"
-							>
-								<svg viewBox="0 0 24 24" aria-hidden="true">
-									<path d="M3 12s3.2-6 9-6 9 6 9 6-3.2 6-9 6-9-6-9-6Z" />
-									<circle cx="12" cy="12" r="2.5" />
-								</svg>
-							</button>
-							<div
-								id="cloak-menu"
-								class="cloak-menu"
-								role="menu"
-								aria-label="Tab appearance templates"
-								hidden
-							></div>
-						</div>
 						<button
-							id="theme-toggle"
+							id="user-settings-open"
 							class="icon-button"
 							type="button"
-							title="Switch to dark mode"
-							aria-label="Switch to dark mode"
+							title="User settings"
+							aria-label="User settings"
 						>
 							<svg viewBox="0 0 24 24" aria-hidden="true">
-								<path
-									d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"
-								/>
+								<path d="M4 7h9m4 0h3M4 17h3m4 0h9" />
+								<circle cx="15" cy="7" r="2" />
+								<circle cx="9" cy="17" r="2" />
 							</svg>
 						</button>
 						<button
@@ -198,20 +191,56 @@
 			<main id="browser-stage" class="browser-stage">
 				<section id="home-screen" class="home-screen" aria-label="New tab">
 					<div class="home-content">
-						<div class="home-brand">
-							<img src="sj.png" alt="" />
-							<div>
-								<span class="home-kicker">YOUR SPACE</span>
-								<h1>Classroom</h1>
+						<section class="home-lead" aria-label="Start browsing">
+							<div class="home-brand">
+								<img src="sj.png" alt="" />
+								<div>
+									<span class="home-kicker">CLASSROOM</span>
+									<span class="home-edition">A fresh start, every tab.</span>
+								</div>
 							</div>
-						</div>
-						<p class="home-prompt">Where to today?</p>
-						<div
-							id="quick-links"
-							class="quick-links"
-							aria-label="Bookmarks and shortcuts"
-						></div>
+							<h1>What are you<br />looking for?</h1>
+							<p class="home-intro">Make a little room for curiosity.</p>
+							<form id="home-search-form" class="home-search" role="search">
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<circle cx="10.8" cy="10.8" r="6.3" />
+									<path d="m15.5 15.5 4 4" />
+								</svg>
+								<input
+									id="home-address"
+									type="text"
+									placeholder="Search the web or enter an address"
+									autocapitalize="off"
+									autocorrect="off"
+									spellcheck="false"
+									aria-label="Search the web or enter an address"
+								/>
+								<button type="submit" aria-label="Search">
+									<svg viewBox="0 0 24 24" aria-hidden="true">
+										<path d="M5 12h13m-5-5 5 5-5 5" />
+									</svg>
+								</button>
+							</form>
+						</section>
+						<section class="home-shortcuts" aria-label="Quick access">
+							<div class="home-section-heading">
+								<h2>Pick up where you like</h2>
+								<span>SHORTCUTS</span>
+							</div>
+							<div
+								id="quick-links"
+								class="quick-links"
+								aria-label="Bookmarks and shortcuts"
+							></div>
+						</section>
 					</div>
+					<footer class="home-footer">
+						<p class="home-notice">
+							For authorized personal use only. Do not use this service to
+							bypass school, workplace, network, or content restrictions. Follow
+							your organization's policies and local laws.
+						</p>
+					</footer>
 				</section>
 				<div id="frame-host" class="frame-host"></div>
 				<div class="status-block" aria-live="polite">
@@ -219,6 +248,18 @@
 					<pre id="sj-error-code"></pre>
 				</div>
 			</main>
+		</div>
+		<div
+			id="startup-screen"
+			class="startup-screen"
+			role="status"
+			aria-live="polite"
+		>
+			<div class="startup-content">
+				<img src="/sj.png" alt="" />
+				<p id="startup-message">Getting things ready</p>
+				<div class="startup-track" aria-hidden="true"><span></span></div>
+			</div>
 		</div>
 		<dialog
 			id="admin-dialog"
@@ -265,6 +306,123 @@
 			</section>
 			<p id="admin-message" class="dialog-message" aria-live="polite"></p>
 		</dialog>
+		<dialog
+			id="user-settings-dialog"
+			class="utility-dialog user-settings-dialog"
+			aria-labelledby="user-settings-title"
+		>
+			<div class="dialog-heading">
+				<div>
+					<span class="dialog-kicker">YOUR CLASSROOM</span>
+					<h2 id="user-settings-title">Personalize</h2>
+				</div>
+				<button
+					id="user-settings-close"
+					class="icon-button"
+					type="button"
+					aria-label="Close user settings"
+					title="Close"
+				>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<path d="m6 6 12 12M18 6 6 18" />
+					</svg>
+				</button>
+			</div>
+			<form id="user-settings-form">
+				<label for="theme-select">Theme</label>
+				<div class="theme-select-row">
+					<select id="theme-select" aria-label="Theme">
+						<option value="moss">Moss</option>
+						<option value="sunset">Sunset</option>
+						<option value="ocean">Ocean</option>
+						<option value="midnight">Midnight</option>
+					</select>
+					<button
+						id="create-custom-theme"
+						class="dialog-secondary"
+						type="button"
+					>
+						New theme
+					</button>
+				</div>
+				<label for="background-select">Home background</label>
+				<select id="background-select">
+					<option value="grid">Fine grid</option>
+					<option value="lines">Diagonal lines</option>
+					<option value="plain">Clean</option>
+					<option value="image">Custom image</option>
+				</select>
+				<label for="background-image-file">Background image</label>
+				<input
+					id="background-image-file"
+					type="file"
+					accept="image/png,image/jpeg,image/webp,image/gif"
+				/>
+				<div class="background-image-preview-row">
+					<img id="background-image-preview" alt="" hidden />
+					<button
+						id="remove-background-image"
+						class="dialog-secondary"
+						type="button"
+						hidden
+					>
+						Remove image
+					</button>
+				</div>
+				<label for="default-cloak-select">Default tab appearance</label>
+				<select id="default-cloak-select">
+					<option value="normal">Original</option>
+					<option value="google">Google</option>
+					<option value="youtube">YouTube</option>
+					<option value="geforce">Google Classroom</option>
+					<option value="tiktok">TikTok</option>
+				</select>
+				<fieldset
+					id="custom-theme-controls"
+					class="custom-theme-controls"
+					hidden
+				>
+					<legend>Custom theme</legend>
+					<label for="custom-theme-name">Theme name</label>
+					<input
+						id="custom-theme-name"
+						type="text"
+						maxlength="28"
+						placeholder="My theme"
+					/>
+					<label for="custom-background-color">Page background</label>
+					<input id="custom-background-color" type="color" value="#e5eee6" />
+					<label for="custom-surface-color">Toolbar and surfaces</label>
+					<input id="custom-surface-color" type="color" value="#f1f5ef" />
+					<label for="custom-accent-color">Accent</label>
+					<input id="custom-accent-color" type="color" value="#c3e957" />
+					<label for="custom-text-color">Text</label>
+					<input id="custom-text-color" type="color" value="#1b3024" />
+					<button
+						id="delete-custom-theme"
+						class="dialog-secondary"
+						type="button"
+					>
+						Delete theme
+					</button>
+				</fieldset>
+				<div class="settings-actions">
+					<button
+						id="user-settings-reset"
+						class="dialog-secondary"
+						type="button"
+					>
+						Reset
+					</button>
+					<button class="dialog-primary" type="submit">Save settings</button>
+				</div>
+				<p
+					id="user-settings-message"
+					class="dialog-message"
+					aria-live="polite"
+				></p>
+			</form>
+		</dialog>
 		<section
 			id="blocked-overlay"
 			class="blocked-overlay"
@@ -277,5 +435,17 @@
 				alt="Access restricted. This website has been blocked by your administrator."
 			/>
 		</section>
+		<button
+			id="fullscreen-exit"
+			class="fullscreen-exit"
+			type="button"
+			title="Exit full screen (Esc)"
+			aria-label="Exit full screen"
+			hidden
+		>
+			<svg viewBox="0 0 24 24" aria-hidden="true">
+				<path d="M8 4v4H4m16 0h-4V4M4 16h4v4m12-4h-4v4" />
+			</svg>
+		</button>
 	</body>
 </html>

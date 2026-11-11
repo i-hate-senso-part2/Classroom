@@ -21,5 +21,30 @@ async function registerSW() {
 		throw new Error("Your browser doesn't support service workers.");
 	}
 
-	await navigator.serviceWorker.register(stockSW);
+	const registration = await navigator.serviceWorker.register(stockSW);
+	const worker = registration.installing || registration.waiting;
+	if (worker && worker.state !== "activated") {
+		await new Promise((resolve, reject) => {
+			const onStateChange = () => {
+				if (worker.state === "activated") {
+					worker.removeEventListener("statechange", onStateChange);
+					resolve();
+				} else if (worker.state === "redundant") {
+					worker.removeEventListener("statechange", onStateChange);
+					reject(new Error("Scramjet service worker failed to activate."));
+				}
+			};
+			worker.addEventListener("statechange", onStateChange);
+			onStateChange();
+		});
+	}
+	await navigator.serviceWorker.ready;
+	if (navigator.serviceWorker.controller !== registration.active) {
+		await new Promise((resolve) => {
+			navigator.serviceWorker.addEventListener("controllerchange", resolve, {
+				once: true,
+			});
+		});
+	}
+	return registration;
 }

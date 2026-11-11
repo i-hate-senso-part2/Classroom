@@ -20,6 +20,8 @@ const SEARCH_ENGINES = Object.freeze({
 
 const form = document.getElementById("sj-form");
 const address = document.getElementById("sj-address");
+const homeSearchForm = document.getElementById("home-search-form");
+const homeAddress = document.getElementById("home-address");
 const searchEngine = document.getElementById("sj-search-engine");
 const error = document.getElementById("sj-error");
 const errorCode = document.getElementById("sj-error-code");
@@ -28,10 +30,12 @@ const frameHost = document.getElementById("frame-host");
 const homeScreen = document.getElementById("home-screen");
 const progress = document.getElementById("browser-progress");
 const quickLinks = document.getElementById("quick-links");
-const cloakMenu = document.getElementById("cloak-menu");
-const cloakButton = document.getElementById("cloak-open");
+const startupScreen = document.getElementById("startup-screen");
 const adminDialog = document.getElementById("admin-dialog");
+const userSettingsDialog = document.getElementById("user-settings-dialog");
 const blockedOverlay = document.getElementById("blocked-overlay");
+const fullscreenToggle = document.getElementById("fullscreen-toggle");
+const fullscreenExit = document.getElementById("fullscreen-exit");
 const picker = document.querySelector(".engine-picker");
 const trigger = document.querySelector(".engine-trigger");
 const menu = document.querySelector(".engine-menu");
@@ -62,12 +66,32 @@ const cloakTemplates = [
 	{ id: "normal", title: "", logo: "/sj.png" },
 	{ id: "google", title: "Google", logo: "/logos/google.webp" },
 	{ id: "youtube", title: "YouTube", logo: "/logos/youtube.webp" },
-	{ id: "geforce", title: "GeForce NOW", logo: "/logos/geforce.png" },
+	{ id: "geforce", title: "Google Classroom", logo: "/logos/classroom.png" },
 	{ id: "tiktok", title: "TikTok", logo: "/logos/tiktok.png" },
 ];
+const DEFAULT_USER_SETTINGS = Object.freeze({
+	theme: "moss",
+	background: "grid",
+	defaultCloak: "normal",
+	backgroundImage: "",
+	customThemes: Object.freeze([]),
+	defaultCustomTheme: Object.freeze({
+		background: "#e5eee6",
+		surface: "#f1f5ef",
+		accent: "#c3e957",
+		text: "#1b3024",
+	}),
+});
+const BUILT_IN_THEMES = new Set(["moss", "sunset", "ocean", "midnight"]);
+const HOME_BACKGROUNDS = new Set(["grid", "lines", "plain", "image"]);
+const CLOAK_NAMES = new Set(cloakTemplates.map((template) => template.id));
+const IMAGE_DATA_URL =
+	/^data:image\/(?:png|jpeg|webp|gif);base64,[\da-z+/]+=*$/i;
 let activeTabId = null;
 let tabSequence = 0;
-let transportReady;
+let controller;
+let controllerReady;
+let settingsDraft = null;
 let bookmarks = [];
 let arrowSequenceIndex = 0;
 const arrowSequence = ["ArrowUp", "ArrowDown", "ArrowUp", "ArrowDown"];
@@ -78,6 +102,116 @@ try {
 } catch {
 	bookmarks = [];
 }
+
+function validColor(value, fallback) {
+	return typeof value === "string" && /^#[\da-f]{6}$/i.test(value)
+		? value
+		: fallback;
+}
+
+function sanitizeCustomThemes(themes) {
+	if (!Array.isArray(themes)) return [];
+	return themes
+		.filter(
+			(theme) =>
+				theme &&
+				typeof theme.id === "string" &&
+				theme.id.startsWith("custom-") &&
+				typeof theme.name === "string"
+		)
+		.slice(0, 20)
+		.map((theme) => ({
+			id: theme.id,
+			name: theme.name.trim().slice(0, 28) || "Custom theme",
+			colors: {
+				background: validColor(
+					theme.colors?.background,
+					DEFAULT_USER_SETTINGS.defaultCustomTheme.background
+				),
+				surface: validColor(
+					theme.colors?.surface,
+					DEFAULT_USER_SETTINGS.defaultCustomTheme.surface
+				),
+				accent: validColor(
+					theme.colors?.accent,
+					DEFAULT_USER_SETTINGS.defaultCustomTheme.accent
+				),
+				text: validColor(
+					theme.colors?.text,
+					DEFAULT_USER_SETTINGS.defaultCustomTheme.text
+				),
+			},
+		}));
+}
+
+function loadUserSettings() {
+	try {
+		const stored = JSON.parse(
+			localStorage.getItem("classroom-user-settings") || "null"
+		);
+		if (stored && typeof stored === "object") {
+			const customThemes = sanitizeCustomThemes(stored.customThemes);
+			if (stored.customTheme && customThemes.length === 0) {
+				customThemes.push({
+					id: "custom-default",
+					name: "My theme",
+					colors: {
+						background: validColor(
+							stored.customTheme.background,
+							DEFAULT_USER_SETTINGS.defaultCustomTheme.background
+						),
+						surface: validColor(
+							stored.customTheme.surface,
+							DEFAULT_USER_SETTINGS.defaultCustomTheme.surface
+						),
+						accent: validColor(
+							stored.customTheme.accent,
+							DEFAULT_USER_SETTINGS.defaultCustomTheme.accent
+						),
+						text: validColor(
+							stored.customTheme.text,
+							DEFAULT_USER_SETTINGS.defaultCustomTheme.text
+						),
+					},
+				});
+			}
+			const storedTheme =
+				stored.theme === "custom" ? "custom-default" : stored.theme;
+			return {
+				theme:
+					BUILT_IN_THEMES.has(storedTheme) ||
+					customThemes.some((theme) => theme.id === storedTheme)
+						? storedTheme
+						: "moss",
+				background: HOME_BACKGROUNDS.has(stored.background)
+					? stored.background
+					: "grid",
+				defaultCloak: CLOAK_NAMES.has(stored.defaultCloak)
+					? stored.defaultCloak
+					: "normal",
+				backgroundImage:
+					typeof stored.backgroundImage === "string" &&
+					IMAGE_DATA_URL.test(stored.backgroundImage)
+						? stored.backgroundImage
+						: "",
+				customThemes,
+			};
+		}
+		const previousTheme = localStorage.getItem("classroom-theme");
+		return {
+			...DEFAULT_USER_SETTINGS,
+			theme: previousTheme === "dark" ? "midnight" : "moss",
+			customThemes: [],
+		};
+	} catch {
+		return {
+			...DEFAULT_USER_SETTINGS,
+			customThemes: [],
+		};
+	}
+}
+
+let userSettings = loadUserSettings();
 
 function logoMarkup(key) {
 	return `<span class="engine-icon" aria-hidden="true"><img src="${SEARCH_ENGINES[key].logo}" alt="" /></span>`;
@@ -198,7 +332,7 @@ function syncBrowser() {
 	progress.classList.toggle("loading", tab.loading);
 	for (const current of tabs) {
 		if (current.frame)
-			current.frame.frame.hidden = current.id !== activeTabId || current.home;
+			current.frame.element.hidden = current.id !== activeTabId || current.home;
 	}
 	homeScreen.hidden = !tab.home;
 	address.value = tab.home ? "" : tab.url;
@@ -207,6 +341,7 @@ function syncBrowser() {
 	document.getElementById("go-forward").disabled =
 		!tab.frame || tab.historyIndex >= tab.history.length - 1;
 	document.getElementById("reload-page").disabled = !tab.frame || tab.home;
+	document.getElementById("go-home").disabled = tab.home;
 	const saved = bookmarks.some(
 		(bookmark) => bookmark.url === tab.url && !tab.home
 	);
@@ -216,54 +351,252 @@ function syncBrowser() {
 	const cloak = cloakTemplates.find((item) => item.id === tab.cloak);
 	document.title = cloak?.title || (tab.home ? "New tab" : tab.title);
 	document.getElementById("browser-favicon").href = cloak?.logo || "/sj.png";
-	if (tab.frame) tab.frame.frame.title = cloak?.title || tab.title;
+	if (tab.frame) tab.frame.element.title = cloak?.title || tab.title;
 	renderTabs();
 }
 
-function renderCloakMenu() {
-	cloakMenu.replaceChildren();
-	for (const template of cloakTemplates) {
-		const button = document.createElement("button");
-		button.type = "button";
-		button.className = "cloak-option";
-		button.dataset.cloak = template.id;
-		button.setAttribute("role", "menuitemradio");
-		button.setAttribute("aria-checked", "false");
-		button.innerHTML = `<span class="cloak-option-icon"><img src="${template.logo}" alt="" /></span><span>${template.title || "Original tab"}</span>`;
-		cloakMenu.append(button);
+const CUSTOM_THEME_PROPERTIES = [
+	"--background",
+	"--chrome",
+	"--chrome-raised",
+	"--tab-inactive",
+	"--text",
+	"--muted",
+	"--home-muted",
+	"--accent",
+	"--accent-warm",
+	"--hover",
+	"--field",
+	"--menu",
+	"--menu-active",
+	"--field-text",
+	"--home",
+	"--home-title",
+	"--home-card",
+	"--home-icon",
+	"--line",
+	"--home-card-border",
+	"--home-grid",
+	"--surface-shadow",
+];
+
+function renderThemeOptions(settings) {
+	const select = document.getElementById("theme-select");
+	select
+		.querySelectorAll("[data-custom-theme]")
+		.forEach((option) => option.remove());
+	for (const theme of settings.customThemes) {
+		const option = document.createElement("option");
+		option.value = theme.id;
+		option.textContent = theme.name;
+		option.dataset.customTheme = "true";
+		select.append(option);
+	}
+	select.value = settings.theme;
+}
+
+function applyUserSettings(settings) {
+	const root = document.documentElement;
+	root.dataset.theme = settings.theme;
+	root.dataset.homeBackground = settings.background;
+	if (
+		settings.backgroundImage &&
+		IMAGE_DATA_URL.test(settings.backgroundImage)
+	) {
+		root.style.setProperty(
+			"--home-background-image",
+			`url("${settings.backgroundImage}")`
+		);
+	} else {
+		root.style.removeProperty("--home-background-image");
+	}
+	for (const property of CUSTOM_THEME_PROPERTIES) {
+		root.style.removeProperty(property);
+	}
+	const theme = settings.customThemes.find(
+		(item) => item.id === settings.theme
+	);
+	if (theme) {
+		const { background, surface, accent, text } = theme.colors;
+		const customProperties = {
+			"--background": background,
+			"--home": background,
+			"--chrome": surface,
+			"--chrome-raised": surface,
+			"--tab-inactive": surface,
+			"--field": surface,
+			"--menu": surface,
+			"--text": text,
+			"--muted": `color-mix(in srgb, ${text} 64%, transparent)`,
+			"--home-muted": `color-mix(in srgb, ${text} 64%, transparent)`,
+			"--home-title": text,
+			"--field-text": text,
+			"--menu-text": text,
+			"--hover": `color-mix(in srgb, ${surface} 84%, ${text})`,
+			"--menu-active": `color-mix(in srgb, ${surface} 84%, ${text})`,
+			"--accent": accent,
+			"--accent-warm": accent,
+			"--home-icon": surface,
+			"--home-card": `color-mix(in srgb, ${surface} 82%, white)`,
+			"--line": `color-mix(in srgb, ${text} 16%, transparent)`,
+			"--home-card-border": `color-mix(in srgb, ${text} 16%, transparent)`,
+			"--home-grid": `color-mix(in srgb, ${text} 6%, transparent)`,
+			"--surface-shadow": `color-mix(in srgb, ${text} 14%, transparent)`,
+		};
+		for (const [property, value] of Object.entries(customProperties)) {
+			root.style.setProperty(property, value);
+		}
+	}
+	for (const tab of tabs) {
+		tab.cloak =
+			settings.defaultCloak === "normal" ? null : settings.defaultCloak;
+	}
+	if (tabs.length) syncBrowser();
+	renderThemeOptions(settings);
+	document.getElementById("background-select").value = settings.background;
+	document.getElementById("default-cloak-select").value = settings.defaultCloak;
+	const preview = document.getElementById("background-image-preview");
+	preview.hidden = !settings.backgroundImage;
+	preview.src = settings.backgroundImage || "";
+	document.getElementById("remove-background-image").hidden =
+		!settings.backgroundImage;
+	const customControls = document.getElementById("custom-theme-controls");
+	customControls.hidden = !theme;
+	document.getElementById("delete-custom-theme").hidden = !theme;
+}
+
+function saveUserSettings() {
+	try {
+		localStorage.setItem(
+			"classroom-user-settings",
+			JSON.stringify(userSettings)
+		);
+		return true;
+	} catch {
+		const message = document.getElementById("user-settings-message");
+		if (message)
+			message.textContent = "Settings could not be saved in this browser.";
+		return false;
 	}
 }
 
-function setCloak(templateId) {
-	const tab = activeTab();
-	if (!tab) return;
-	tab.cloak = templateId === "normal" ? null : templateId;
-	const template = cloakTemplates.find((item) => item.id === tab.cloak);
-	cloakMenu.querySelectorAll(".cloak-option").forEach((option) => {
-		const selected = option.dataset.cloak === (template?.id || "normal");
-		option.classList.toggle("active", selected);
-		option.setAttribute("aria-checked", String(selected));
-	});
-	cloakMenu.hidden = true;
-	cloakButton.setAttribute("aria-expanded", "false");
-	syncBrowser();
+function readSettingsForm() {
+	const settings = {
+		...settingsDraft,
+		customThemes: settingsDraft.customThemes.map((theme) => ({
+			...theme,
+			colors: { ...theme.colors },
+		})),
+		theme: document.getElementById("theme-select").value,
+		background: document.getElementById("background-select").value,
+		defaultCloak: document.getElementById("default-cloak-select").value,
+	};
+	const theme = settings.customThemes.find(
+		(item) => item.id === settings.theme
+	);
+	if (theme) {
+		theme.name =
+			document.getElementById("custom-theme-name").value.trim() ||
+			"Custom theme";
+		theme.colors = {
+			background: document.getElementById("custom-background-color").value,
+			surface: document.getElementById("custom-surface-color").value,
+			accent: document.getElementById("custom-accent-color").value,
+			text: document.getElementById("custom-text-color").value,
+		};
+	}
+	return settings;
 }
 
-function setTheme(theme) {
-	document.documentElement.dataset.theme = theme;
-	const dark = theme === "dark";
-	const button = document.getElementById("theme-toggle");
-	button.setAttribute(
-		"aria-label",
-		`Switch to ${dark ? "light" : "dark"} mode`
+function syncSettingsForm(settings) {
+	renderThemeOptions(settings);
+	document.getElementById("background-select").value = settings.background;
+	document.getElementById("default-cloak-select").value = settings.defaultCloak;
+	const theme = settings.customThemes.find(
+		(item) => item.id === settings.theme
 	);
-	button.title = `Switch to ${dark ? "light" : "dark"} mode`;
-	button.innerHTML = dark
-		? `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>`
-		: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>`;
-	try {
-		localStorage.setItem("classroom-theme", theme);
-	} catch {}
+	const colors = theme?.colors || DEFAULT_USER_SETTINGS.defaultCustomTheme;
+	document.getElementById("custom-theme-name").value = theme?.name || "";
+	document.getElementById("custom-background-color").value = colors.background;
+	document.getElementById("custom-surface-color").value = colors.surface;
+	document.getElementById("custom-accent-color").value = colors.accent;
+	document.getElementById("custom-text-color").value = colors.text;
+	const preview = document.getElementById("background-image-preview");
+	preview.hidden = !settings.backgroundImage;
+	preview.src = settings.backgroundImage || "";
+	document.getElementById("remove-background-image").hidden =
+		!settings.backgroundImage;
+	document.getElementById("background-image-file").value = "";
+	document.getElementById("custom-theme-controls").hidden = !theme;
+	document.getElementById("delete-custom-theme").hidden = !theme;
+}
+
+function openUserSettings() {
+	settingsDraft = JSON.parse(JSON.stringify(userSettings));
+	syncSettingsForm(settingsDraft);
+	document.getElementById("user-settings-message").textContent = "";
+	userSettingsDialog.showModal();
+}
+
+function previewUserSettings() {
+	settingsDraft = readSettingsForm();
+	applyUserSettings(settingsDraft);
+}
+
+function createCustomTheme() {
+	settingsDraft = readSettingsForm();
+	if (settingsDraft.customThemes.length >= 20) {
+		document.getElementById("user-settings-message").textContent =
+			"You can save up to 20 custom themes.";
+		return;
+	}
+	const id = `custom-${crypto.randomUUID()}`;
+	settingsDraft.customThemes.push({
+		id,
+		name: "My theme",
+		colors: { ...DEFAULT_USER_SETTINGS.defaultCustomTheme },
+	});
+	settingsDraft.theme = id;
+	syncSettingsForm(settingsDraft);
+	applyUserSettings(settingsDraft);
+}
+
+function deleteCustomTheme() {
+	settingsDraft = readSettingsForm();
+	settingsDraft.customThemes = settingsDraft.customThemes.filter(
+		(theme) => theme.id !== settingsDraft.theme
+	);
+	settingsDraft.theme = "moss";
+	syncSettingsForm(settingsDraft);
+	applyUserSettings(settingsDraft);
+}
+
+async function encodeBackgroundImage(file) {
+	if (!file || !/^image\/(?:png|jpeg|webp|gif)$/.test(file.type)) {
+		throw new Error("Choose a PNG, JPEG, WebP, or GIF image.");
+	}
+	if (file.size > 12 * 1024 * 1024) {
+		throw new Error("Choose an image smaller than 12 MB.");
+	}
+	const bitmap = await createImageBitmap(file);
+	const scale = Math.min(1, 1600 / bitmap.width, 1000 / bitmap.height);
+	const canvas = document.createElement("canvas");
+	canvas.width = Math.round(bitmap.width * scale);
+	canvas.height = Math.round(bitmap.height * scale);
+	canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+	bitmap.close();
+	const blob = await new Promise((resolve) =>
+		canvas.toBlob(resolve, "image/webp", 0.75)
+	);
+	if (!blob || blob.size > 2 * 1024 * 1024) {
+		throw new Error("This image is too large to store in browser settings.");
+	}
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(reader.result);
+		reader.onerror = () => reject(new Error("This image could not be read."));
+		reader.readAsDataURL(blob);
+	});
 }
 
 function openAdminDialog() {
@@ -313,8 +646,13 @@ async function refreshAdminPanel() {
 async function refreshBlockedState() {
 	try {
 		const response = await fetch("/api/browser-state", { cache: "no-store" });
-		if (response.ok) blockedOverlay.hidden = !(await response.json()).blocked;
-	} catch {}
+		if (!response.ok) return false;
+		const { blocked } = await response.json();
+		blockedOverlay.hidden = !blocked;
+		return blocked;
+	} catch {
+		return false;
+	}
 }
 
 function showAdminMessage(message, isError = false) {
@@ -389,35 +727,56 @@ function updateTabUrl(tab, url) {
 
 function createFrame(tab) {
 	if (tab.frame) return tab.frame;
-	const frame = scramjet.createFrame();
-	frame.frame.className = "page-frame";
-	frame.frame.title = tab.title;
-	frame.frame.hidden = true;
-	frame.addEventListener("navigate", () => setLoading(true, tab));
-	frame.addEventListener("urlchange", (event) => {
-		updateTabUrl(tab, event.url);
+	const frame = controller.createFrame();
+	frame.element.className = "page-frame";
+	frame.element.title = tab.title;
+	frame.element.hidden = true;
+	frame.element.addEventListener("load", () => {
+		try {
+			const frameUrl = new URL(frame.element.contentWindow.location.href);
+			const prefixPath = new URL(frame.prefix, location.href).pathname;
+			const encodedUrl = frameUrl.pathname.slice(prefixPath.length);
+			const decodedUrl = controller.config.codec.decode(encodedUrl);
+			if (decodedUrl) updateTabUrl(tab, decodedUrl);
+		} catch {}
 		setLoading(false, tab);
 	});
-	frame.frame.addEventListener("load", () => setLoading(false, tab));
 	tab.frame = frame;
-	frameHost.append(frame.frame);
+	frameHost.append(frame.element);
 	return frame;
 }
 
 async function prepareTransport() {
-	if (!transportReady) {
-		transportReady = (async () => {
-			await registerSW();
-			await scramjetReady;
+	if (!controllerReady) {
+		const initialization = (async () => {
+			const registration = await registerSW();
+			await navigator.serviceWorker.ready;
+			const serviceWorker =
+				navigator.serviceWorker.controller || registration.active;
+			if (!serviceWorker)
+				throw new Error("Scramjet service worker is unavailable.");
+
+			const api = window.$scramjetController;
+			api.config.injectPath = "/scramjet-controller/controller.inject.js";
+			api.config.scramjetPath = "/scramjet/scramjet.js";
+			api.config.wasmPath = "/scramjet/scramjet.wasm";
 			const wispUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/wisp/`;
-			if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
-				await connection.setTransport("/libcurl/index.mjs", [
-					{ websocket: wispUrl },
-				]);
-			}
+			const transport = new window.LibcurlTransport.LibcurlClient({
+				wisp: wispUrl,
+			});
+			controller = new api.Controller({
+				serviceworker: serviceWorker,
+				transport,
+			});
+			await controller.wait();
 		})();
+		controllerReady = initialization.catch((error) => {
+			controller = null;
+			controllerReady = null;
+			throw error;
+		});
 	}
-	return transportReady;
+	return controllerReady;
 }
 
 async function navigateTab(tab, url) {
@@ -427,7 +786,7 @@ async function navigateTab(tab, url) {
 		tab.home = false;
 		updateTabUrl(tab, url);
 		const frame = createFrame(tab);
-		frame.frame.hidden = tab.id !== activeTabId;
+		frame.element.hidden = tab.id !== activeTabId;
 		frame.go(url);
 		setLoading(true, tab);
 		syncBrowser();
@@ -444,6 +803,8 @@ function createTab() {
 	const tab = {
 		id: `tab-${++tabSequence}`,
 		title: "New tab",
+		cloak:
+			userSettings.defaultCloak === "normal" ? null : userSettings.defaultCloak,
 		url: "",
 		home: true,
 		frame: null,
@@ -462,7 +823,7 @@ function closeTab(tabId) {
 	const index = tabs.findIndex((tab) => tab.id === tabId);
 	if (index < 0) return;
 	const [tab] = tabs.splice(index, 1);
-	if (tab.frame) tab.frame.frame.remove();
+	if (tab.frame) tab.frame.element.remove();
 	if (tabs.length === 0) {
 		createTab();
 		return;
@@ -497,31 +858,21 @@ function toggleBookmark() {
 }
 
 renderMenu();
-renderCloakMenu();
 setSearchEngine("google");
-try {
-	setTheme(
-		localStorage.getItem("classroom-theme") === "light" ? "light" : "dark"
-	);
-} catch {
-	setTheme("dark");
-}
-
-const { ScramjetController } = $scramjetLoadController();
-const scramjet = new ScramjetController({
-	files: {
-		wasm: "/scram/scramjet.wasm.wasm",
-		all: "/scram/scramjet.all.js",
-		sync: "/scram/scramjet.sync.js",
-	},
-});
-const scramjetReady = Promise.resolve(scramjet.init());
-const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+applyUserSettings(userSettings);
 
 form.addEventListener("submit", (event) => {
 	event.preventDefault();
 	const value = address.value.trim();
 	if (!value) return;
+	navigateTab(activeTab(), search(value, searchEngine.value));
+});
+
+homeSearchForm.addEventListener("submit", (event) => {
+	event.preventDefault();
+	const value = homeAddress.value.trim();
+	if (!value) return;
+	address.value = value;
 	navigateTab(activeTab(), search(value, searchEngine.value));
 });
 
@@ -553,35 +904,133 @@ document.getElementById("go-home").addEventListener("click", goHome);
 document
 	.getElementById("save-bookmark")
 	.addEventListener("click", toggleBookmark);
-document.getElementById("theme-toggle").addEventListener("click", () => {
-	setTheme(
-		document.documentElement.dataset.theme === "dark" ? "light" : "dark"
+
+document
+	.getElementById("user-settings-open")
+	.addEventListener("click", openUserSettings);
+document
+	.getElementById("user-settings-close")
+	.addEventListener("click", () => userSettingsDialog.close());
+document
+	.getElementById("user-settings-form")
+	.addEventListener("submit", (event) => {
+		event.preventDefault();
+		userSettings = readSettingsForm();
+		settingsDraft = null;
+		applyUserSettings(userSettings);
+		if (saveUserSettings()) {
+			document.getElementById("user-settings-message").textContent =
+				"Settings saved on this device.";
+		}
+	});
+document.getElementById("theme-select").addEventListener("change", () => {
+	const currentTheme = settingsDraft.customThemes.find(
+		(theme) => theme.id === settingsDraft.theme
 	);
+	if (currentTheme) {
+		currentTheme.name =
+			document.getElementById("custom-theme-name").value.trim() ||
+			"Custom theme";
+		currentTheme.colors = {
+			background: document.getElementById("custom-background-color").value,
+			surface: document.getElementById("custom-surface-color").value,
+			accent: document.getElementById("custom-accent-color").value,
+			text: document.getElementById("custom-text-color").value,
+		};
+	}
+	settingsDraft.theme = document.getElementById("theme-select").value;
+	syncSettingsForm(settingsDraft);
+	applyUserSettings(settingsDraft);
+});
+for (const id of [
+	"background-select",
+	"default-cloak-select",
+	"custom-theme-name",
+	"custom-background-color",
+	"custom-surface-color",
+	"custom-accent-color",
+	"custom-text-color",
+]) {
+	document.getElementById(id).addEventListener("input", previewUserSettings);
+	document.getElementById(id).addEventListener("change", previewUserSettings);
+}
+document
+	.getElementById("create-custom-theme")
+	.addEventListener("click", createCustomTheme);
+document
+	.getElementById("delete-custom-theme")
+	.addEventListener("click", deleteCustomTheme);
+document
+	.getElementById("background-image-file")
+	.addEventListener("change", async (event) => {
+		const file = event.target.files?.[0];
+		if (!file) return;
+		try {
+			settingsDraft = readSettingsForm();
+			settingsDraft.backgroundImage = await encodeBackgroundImage(file);
+			settingsDraft.background = "image";
+			syncSettingsForm(settingsDraft);
+			applyUserSettings(settingsDraft);
+			document.getElementById("user-settings-message").textContent =
+				"Background preview ready. Save settings to keep it.";
+		} catch (error) {
+			document.getElementById("user-settings-message").textContent =
+				error.message;
+			event.target.value = "";
+		}
+	});
+document
+	.getElementById("remove-background-image")
+	.addEventListener("click", () => {
+		settingsDraft = readSettingsForm();
+		settingsDraft.backgroundImage = "";
+		if (settingsDraft.background === "image") settingsDraft.background = "grid";
+		syncSettingsForm(settingsDraft);
+		applyUserSettings(settingsDraft);
+	});
+document.getElementById("user-settings-reset").addEventListener("click", () => {
+	userSettings = {
+		...DEFAULT_USER_SETTINGS,
+		customThemes: [],
+	};
+	settingsDraft = null;
+	syncSettingsForm(userSettings);
+	applyUserSettings(userSettings);
+	if (saveUserSettings()) {
+		document.getElementById("user-settings-message").textContent =
+			"Default settings restored.";
+	}
+});
+userSettingsDialog.addEventListener("close", () => {
+	if (settingsDraft) {
+		settingsDraft = null;
+		applyUserSettings(userSettings);
+	}
 });
 
-cloakButton.addEventListener("click", () => {
-	const willOpen = cloakMenu.hidden;
-	cloakMenu.hidden = !willOpen;
-	cloakButton.setAttribute("aria-expanded", String(willOpen));
-	if (willOpen) {
-		const selected = activeTab()?.cloak || "normal";
-		cloakMenu.querySelectorAll(".cloak-option").forEach((option) => {
-			const isSelected = option.dataset.cloak === selected;
-			option.classList.toggle("active", isSelected);
-			option.setAttribute("aria-checked", String(isSelected));
-		});
+async function updateFullscreenState() {
+	const isFullscreen = Boolean(document.fullscreenElement);
+	fullscreenExit.hidden = !isFullscreen;
+	fullscreenToggle.setAttribute("aria-pressed", String(isFullscreen));
+	fullscreenToggle.setAttribute(
+		"aria-label",
+		`${isFullscreen ? "Exit" : "Enter"} full screen`
+	);
+	fullscreenToggle.title = `${isFullscreen ? "Exit" : "Enter"} full screen`;
+}
+
+async function toggleFullscreen() {
+	try {
+		if (document.fullscreenElement) await document.exitFullscreen();
+		else await document.documentElement.requestFullscreen();
+	} catch (error) {
+		showError("Full screen is unavailable in this browser.", error.message);
 	}
-});
-cloakMenu.addEventListener("click", (event) => {
-	const option = event.target.closest(".cloak-option");
-	if (option) setCloak(option.dataset.cloak);
-});
-document.addEventListener("click", (event) => {
-	if (!event.target.closest(".cloak-control") && !cloakMenu.hidden) {
-		cloakMenu.hidden = true;
-		cloakButton.setAttribute("aria-expanded", "false");
-	}
-});
+}
+
+fullscreenToggle.addEventListener("click", toggleFullscreen);
+fullscreenExit.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", updateFullscreenState);
 
 document
 	.getElementById("admin-open")
@@ -637,11 +1086,12 @@ quickLinks.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-	if (event.key.startsWith("Arrow")) {
-		if (event.key === arrowSequence[arrowSequenceIndex]) {
+	const key = typeof event.key === "string" ? event.key : "";
+	if (key.startsWith("Arrow")) {
+		if (key === arrowSequence[arrowSequenceIndex]) {
 			arrowSequenceIndex++;
 		} else {
-			arrowSequenceIndex = event.key === "ArrowUp" ? 1 : 0;
+			arrowSequenceIndex = key === "ArrowUp" ? 1 : 0;
 		}
 		if (arrowSequenceIndex === arrowSequence.length) {
 			arrowSequenceIndex = 0;
@@ -649,35 +1099,71 @@ document.addEventListener("keydown", (event) => {
 		}
 	}
 	const modifier = event.ctrlKey || event.metaKey;
-	if (modifier && event.key.toLowerCase() === "t") {
+	if (modifier && key.toLowerCase() === "t") {
 		event.preventDefault();
 		createTab();
-	} else if (modifier && event.key.toLowerCase() === "w") {
+	} else if (modifier && key.toLowerCase() === "w") {
 		event.preventDefault();
 		closeTab(activeTabId);
-	} else if (modifier && event.key.toLowerCase() === "l") {
+	} else if (modifier && key.toLowerCase() === "l") {
 		event.preventDefault();
 		address.focus();
 		address.select();
-	} else if (modifier && ["r", "f5"].includes(event.key.toLowerCase())) {
+	} else if (modifier && ["r", "f5"].includes(key.toLowerCase())) {
 		event.preventDefault();
 		activeTab()?.frame?.reload();
-	} else if (event.altKey && event.key === "ArrowLeft") {
+	} else if (event.altKey && key === "ArrowLeft") {
 		event.preventDefault();
 		activeTab()?.frame?.back();
-	} else if (event.altKey && event.key === "ArrowRight") {
+	} else if (event.altKey && key === "ArrowRight") {
 		event.preventDefault();
 		activeTab()?.frame?.forward();
-	} else if (event.key === "Escape") {
+	} else if (key === "Escape") {
 		if (picker?.classList.contains("open")) togglePicker(false);
-		cloakMenu.hidden = true;
-		cloakButton.setAttribute("aria-expanded", "false");
 	}
 });
 
 renderQuickLinks();
 createTab();
-refreshBlockedState();
+
+async function finishStartup() {
+	const blocked = await refreshBlockedState();
+	if (blocked) {
+		startupScreen.hidden = true;
+		return;
+	}
+	const imagesReady = Promise.all(
+		Array.from(document.images, (image) =>
+			image.decode ? image.decode().catch(() => {}) : Promise.resolve()
+		)
+	);
+	const backgroundReady = userSettings.backgroundImage
+		? new Promise((resolve) => {
+				const image = new Image();
+				image.onload = resolve;
+				image.onerror = resolve;
+				image.src = userSettings.backgroundImage;
+			})
+		: Promise.resolve();
+	await Promise.all([
+		document.fonts?.ready || Promise.resolve(),
+		imagesReady,
+		backgroundReady,
+	]);
+	document.getElementById("startup-message").textContent =
+		"Connecting browser transport";
+	try {
+		await Promise.race([
+			prepareTransport(),
+			new Promise((resolve) => window.setTimeout(resolve, 12000)),
+		]);
+	} catch (error) {
+		showError("Browser transport is not ready yet.", error.message);
+	}
+	startupScreen.hidden = true;
+}
+
+finishStartup();
 window.setInterval(refreshBlockedState, 60000);
 document.addEventListener("visibilitychange", () => {
 	if (!document.hidden) refreshBlockedState();
