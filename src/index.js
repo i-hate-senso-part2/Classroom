@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "url";
 import { hostname } from "node:os";
 import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
@@ -17,12 +16,9 @@ dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 const publicPath = fileURLToPath(new URL("../public/", import.meta.url));
-const require = createRequire(import.meta.url);
-const libcurlPath = dirname(
-	require.resolve("@mercuryworkshop/libcurl-transport")
-);
-const scramjetControllerPath = dirname(
-	require.resolve("@mercuryworkshop/scramjet-controller")
+const libcurlPath = fileURLToPath(new URL("../public/libcurl/", import.meta.url));
+const scramjetControllerPath = fileURLToPath(
+	new URL("../public/controller/", import.meta.url)
 );
 const browserStatePath = fileURLToPath(
 	new URL("../data/browser-state.json", import.meta.url)
