@@ -2,12 +2,14 @@
 
 ## Vercel
 
-`vercel.json` sends all routes to `src/index.js` as a Node function. In the Vercel project settings, configure:
+`vercel.json` sends all HTTP routes to the Vercel handler exported by `src/index.js`. The handler serves the browser page, v2 assets, and HTTP APIs. In the Vercel project settings, configure:
 
 - `ADMIN_PASSWORD_HASH` if administrator access is required.
 - `KV_REST_API_URL` and `KV_REST_API_TOKEN` for persistent blocked state, or the supported `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` pair.
 
 Function filesystems are ephemeral, so the local JSON state file is not a suitable Vercel backend. Redeploy after changing environment variables. Admin auth remains disabled if its hash is absent or invalid.
+
+The Wisp endpoint is a WebSocket transport, while this function handles HTTP requests. Proxy navigation therefore requires a WebSocket-capable Wisp service; deploy Wisp on a host that supports persistent WebSocket upgrades and configure the browser to use that endpoint. Do not assume the same-origin `/wisp/` route works through a Vercel function.
 
 ## Docker
 

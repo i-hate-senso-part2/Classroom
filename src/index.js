@@ -182,7 +182,7 @@ Object.assign(wisp.options, {
 	dns_servers: ["1.1.1.3", "1.0.0.3"],
 });
 
-const fastify = Fastify({
+export const fastify = Fastify({
 	serverFactory: (handler) => {
 		return createServer()
 			.on("request", (req, res) => {
@@ -317,35 +317,51 @@ fastify.setNotFoundHandler((res, reply) => {
 	return reply.code(404).type("text/html").sendFile("404.html");
 });
 
-fastify.server.on("listening", () => {
-	const address = fastify.server.address();
+if (!process.env.VERCEL) {
+	fastify.server.on("listening", () => {
+		const address = fastify.server.address();
 
-	// by default we are listening on 0.0.0.0 (every interface)
-	// we just need to list a few
-	console.log("Listening on:");
-	console.log(`\thttp://localhost:${address.port}`);
-	console.log(`\thttp://${hostname()}:${address.port}`);
-	console.log(
-		`\thttp://${
-			address.family === "IPv6" ? `[${address.address}]` : address.address
-		}:${address.port}`
-	);
-});
+		console.log("Listening on:");
+		console.log(`\thttp://localhost:${address.port}`);
+		console.log(`\thttp://${hostname()}:${address.port}`);
+		console.log(
+			`\thttp://${
+				address.family === "IPv6" ? `[${address.address}]` : address.address
+			}:${address.port}`
+		);
+	});
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+	process.on("SIGINT", shutdown);
+	process.on("SIGTERM", shutdown);
 
-function shutdown() {
-	console.log("SIGTERM signal received: closing HTTP server");
-	fastify.close();
-	process.exit(0);
+	function shutdown() {
+		console.log("SIGTERM signal received: closing HTTP server");
+		fastify.close();
+		process.exit(0);
+	}
+
+	let port = parseInt(process.env.PORT || "");
+	if (isNaN(port)) port = 8080;
+
+	fastify.listen({
+		port,
+		host: "0.0.0.0",
+	});
 }
 
-let port = parseInt(process.env.PORT || "");
+let vercelReady;
 
-if (isNaN(port)) port = 8080;
-
-fastify.listen({
-	port: port,
-	host: "0.0.0.0",
-});
+export default async function handler(request, response) {
+	try {
+		if (!vercelReady) vercelReady = fastify.ready();
+		await vercelReady;
+		fastify.server.emit("request", request, response);
+	} catch (error) {
+		console.error("Vercel request handler failed:", error);
+		if (!response.headersSent) {
+			response.statusCode = 500;
+			response.setHeader("content-type", "text/plain; charset=utf-8");
+			response.end("Internal server error");
+		}
+	}
+}
