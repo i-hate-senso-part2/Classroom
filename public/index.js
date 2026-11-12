@@ -469,6 +469,7 @@ function renderQuickLinks() {
 function showError(message, detail = "") {
 	error.textContent = message;
 	errorCode.textContent = detail;
+	error.parentElement.hidden = !message && !detail;
 }
 
 function setLoading(isLoading, tab = activeTab()) {
@@ -539,7 +540,7 @@ async function prepareTransport() {
 			api.config.scramjetPath = "/scramjet/scramjet.js";
 			api.config.wasmPath = "/scramjet/scramjet.wasm";
 			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
-			const transport = new window.LibcurlTransport.LibcurlClient({
+			const transport = new window.CurlMod.default({
 				wisp: wispUrl,
 			});
 			controller = new api.Controller({

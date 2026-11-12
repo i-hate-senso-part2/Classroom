@@ -8,6 +8,12 @@
 		/>
 		<title>Classroom</title>
 		<link id="browser-favicon" rel="icon" href="/sj.png" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap"
+			rel="stylesheet"
+		/>
 		<link rel="stylesheet" href="browser.css" />
 		<script src="/scramjet/scramjet.js"></script>
 		<script src="/scramjet-controller/controller.api.js"></script>
@@ -243,7 +249,7 @@
 					</footer>
 				</section>
 				<div id="frame-host" class="frame-host"></div>
-				<div class="status-block" aria-live="polite">
+				<div class="status-block" aria-live="polite" hidden>
 					<p id="sj-error"></p>
 					<pre id="sj-error-code"></pre>
 				</div>
