@@ -11,6 +11,7 @@ This is the source-of-truth map for the project. Build output, dependency intern
 - `public/search.js`: address-bar URL/search normalization.
 - `public/register-sw.js`: service-worker registration and secure-context checks.
 - `public/sw.js`: Scramjet v2 service-worker routing and activation lifecycle.
+- `public/sw-v1.js`: Scramjet v1.1.0 service-worker routing and activation lifecycle.
 - `public/config.js`: separately defined browser config object; currently not loaded by `index.html`.
 - `public/browser.css` and `public/index.css`: browser presentation styles.
 - `public/404.html`: not-found page.
@@ -18,9 +19,9 @@ This is the source-of-truth map for the project. Build output, dependency intern
 
 ## Browser runtime assets
 
-- `public/scram/`, `public/baremux/`, and `public/controller/`: legacy v1 runtime copies, not used by the active browser flow.
-- `public/libcurl/` and `public/epoxy/`: legacy transport client assets; active Libcurl v2 assets come from the installed package.
-- Installed Scramjet v2 runtime, controller, and Libcurl assets are served under `/scramjet/`, `/scramjet-controller/`, and `/libcurl/` by `src/index.js`.
+- `public/scram/`, `public/baremux/`, and `public/epoxy/`: Scramjet v1.1.0 runtime and transport assets, loaded when selected in the browser toolbar.
+- `public/controller/` and `public/libcurl/`: Scramjet v2 controller and transport assets.
+- Installed Scramjet v2 runtime and the local v1 runtime are served under `/scramjet/` and `/scramjet-v1/`; the remaining controller and transport assets are served from `public/`.
 - `public/logos/`: local images used by quick links, search engines, and tab appearance presets.
 - `public/sj.png`, `public/blocked.png`, and `public/favicon.ico`: brand, restriction-screen, and favicon assets.
 

@@ -23,6 +23,10 @@ const address = document.getElementById("sj-address");
 const homeSearchForm = document.getElementById("home-search-form");
 const homeAddress = document.getElementById("home-address");
 const searchEngine = document.getElementById("sj-search-engine");
+const scramjetVersionSelect = document.getElementById("scramjet-version");
+const scramjetVersion =
+	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "v1" : "v2";
+const legacyScramjetPrefix = "/~1/";
 const error = document.getElementById("sj-error");
 const errorCode = document.getElementById("sj-error-code");
 const tabList = document.getElementById("tab-list");
@@ -212,6 +216,30 @@ if (trigger) {
 	trigger.addEventListener("click", (event) => {
 		event.stopPropagation();
 		togglePicker();
+	});
+}
+
+if (scramjetVersionSelect) {
+	scramjetVersionSelect.value = scramjetVersion;
+	scramjetVersionSelect.addEventListener("change", () => {
+		const nextVersion = scramjetVersionSelect.value;
+		if (!["v1", "v2"].includes(nextVersion)) {
+			scramjetVersionSelect.value = scramjetVersion;
+			return;
+		}
+
+		try {
+			localStorage.setItem("classroom-scramjet-version", nextVersion);
+		} catch (err) {
+			scramjetVersionSelect.value = scramjetVersion;
+			showError(
+				"Unable to save the Scramjet version.",
+				err instanceof Error ? err.message : String(err)
+			);
+			return;
+		}
+
+		location.reload();
 	});
 }
 
@@ -774,16 +802,32 @@ function updateTabUrl(tab, url) {
 
 function createFrame(tab) {
 	if (tab.frame) return tab.frame;
-	const frame = controller.createFrame();
+	const nativeFrame = controller.createFrame();
+	const frame =
+		scramjetVersion === "v1"
+			? {
+					element: nativeFrame.frame,
+					prefix: legacyScramjetPrefix,
+					go: (url) => nativeFrame.go(url),
+					back: () => nativeFrame.back(),
+					forward: () => nativeFrame.forward(),
+					reload: () => nativeFrame.reload(),
+				}
+			: nativeFrame;
 	frame.element.className = "page-frame";
 	frame.element.title = tab.title;
 	frame.element.hidden = true;
 	frame.element.addEventListener("load", () => {
 		try {
 			const frameUrl = new URL(frame.element.contentWindow.location.href);
-			const prefixPath = new URL(frame.prefix, location.href).pathname;
-			const encodedUrl = frameUrl.pathname.slice(prefixPath.length);
-			const decodedUrl = controller.config.codec.decode(encodedUrl);
+			const decodedUrl =
+				scramjetVersion === "v1"
+					? controller.decodeUrl(frameUrl)
+					: controller.config.codec.decode(
+							frameUrl.pathname.slice(
+								new URL(frame.prefix, location.href).pathname.length
+							)
+						);
 			if (decodedUrl) updateTabUrl(tab, decodedUrl);
 		} catch {}
 		setLoading(false, tab);
@@ -796,6 +840,7 @@ function createFrame(tab) {
 async function prepareTransport() {
 	if (!controllerReady) {
 		const initialization = (async () => {
+			await window.CLASSROOM_SCRAMJET_RUNTIME_READY;
 			const registration = await registerSW();
 			await navigator.serviceWorker.ready;
 			const serviceWorker =
@@ -803,11 +848,34 @@ async function prepareTransport() {
 			if (!serviceWorker)
 				throw new Error("Scramjet service worker is unavailable.");
 
+			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
+			if (scramjetVersion === "v1") {
+				const connection = new window.BareMux.BareMuxConnection(
+					"/baremux/worker.js"
+				);
+				const EpoxyTransport = window.EpoxyTransport.default;
+				await connection.setRemoteTransport(
+					new EpoxyTransport({ wisp: wispUrl }),
+					"EpoxyTransport"
+				);
+
+				const { ScramjetController } = window.$scramjetLoadController();
+				controller = new ScramjetController({
+					prefix: legacyScramjetPrefix,
+					files: {
+						wasm: "/scramjet-v1/scramjet.wasm.wasm",
+						all: "/scramjet-v1/scramjet.all.js",
+						sync: "/scramjet-v1/scramjet.sync.js",
+					},
+				});
+				await controller.init();
+				return;
+			}
+
 			const api = window.$scramjetController;
 			api.config.injectPath = "/scramjet-controller/controller.inject.js";
 			api.config.scramjetPath = "/scramjet/scramjet.js";
 			api.config.wasmPath = "/scramjet/scramjet.wasm";
-			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
 			const transport = new window.LibcurlTransport.LibcurlClient({
 				wisp: wispUrl,
 			});

@@ -22,9 +22,42 @@
 			rel="stylesheet"
 		/>
 		<link rel="stylesheet" href="browser.css" />
-		<script src="/scramjet/scramjet.js"></script>
-		<script src="/scramjet-controller/controller.api.js"></script>
-		<script src="/libcurl/index.js?v=2.0.6"></script>
+		<script>
+			(() => {
+				let version = "v2";
+				try {
+					if (localStorage.getItem("classroom-scramjet-version") === "v1") {
+						version = "v1";
+					}
+				} catch {}
+				window.CLASSROOM_SCRAMJET_VERSION = version;
+
+				const sources =
+					version === "v1"
+						? [
+								"/scramjet-v1/scramjet.bundle.js",
+								"/baremux/index.js",
+								"/epoxy/index.js",
+							]
+						: [
+								"/scramjet/scramjet.js",
+								"/scramjet-controller/controller.api.js",
+								"/libcurl/index.js?v=2.0.6",
+							];
+				window.CLASSROOM_SCRAMJET_RUNTIME_READY = (async () => {
+					for (const src of sources) {
+						await new Promise((resolve, reject) => {
+							const script = document.createElement("script");
+							script.src = src;
+							script.onload = resolve;
+							script.onerror = () =>
+								reject(new Error(`Unable to load Scramjet asset: ${src}`));
+							document.head.append(script);
+						});
+					}
+				})();
+			})();
+		</script>
 		<script src="config.js" defer></script>
 		<script src="register-sw.js" defer></script>
 		<script src="search.js" defer></script>
@@ -154,6 +187,16 @@
 								aria-label="Engine options"
 							></div>
 						</div>
+						<label class="scramjet-version-picker">
+							<select
+								id="scramjet-version"
+								aria-label="Scramjet version"
+								title="Switching versions reloads open tabs"
+							>
+								<option value="v1">SE (V1.1.0)</option>
+								<option value="v2">SE (V2)</option>
+							</select>
+						</label>
 						<button
 							id="save-bookmark"
 							class="icon-button bookmark-button"

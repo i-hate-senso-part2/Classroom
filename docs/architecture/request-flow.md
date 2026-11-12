@@ -7,9 +7,9 @@
 ## Browser page flow
 
 1. The server serves `public/index.html` and the static files under `public/`.
-2. Before the first proxied navigation, `public/index.js` registers `public/sw.js` and waits for the Scramjet v2 worker to activate and control the page.
-3. The page creates a v2 `Controller` with a `LibcurlClient` configured for the current host's `/wisp/` WebSocket path.
-4. Controller-managed frames and the v2 service worker handle proxied navigations; ordinary requests not claimed by Scramjet continue through the normal fetch path.
+2. Before the first proxied navigation, `public/index.js` loads the selected runtime, registers its service worker, and waits for it to control the page. Changing the toolbar selector reloads the browser so the selected version and worker stay in sync.
+3. For v2, the page creates a `Controller` with a `LibcurlClient`. For v1.1.0, it creates a `ScramjetController` and configures BareMux with Epoxy. Both use the configured Wisp WebSocket endpoint.
+4. Controller-managed frames and the selected service worker handle proxied navigations; ordinary requests not claimed by Scramjet continue through the normal fetch path.
 
 The browser also polls `/api/admin/browser-state` on load, when the tab becomes visible, and every 10 seconds to update the blocked overlay, announcement popup, shared homepage links, and administrator refresh signal. This endpoint is under `/api/admin` so it receives both current and older path-scoped admin cookies. A previous blocked value is cached locally so it can be displayed before the startup screen on refresh. Expired timed blocks are cleared on state reads.
 
@@ -17,8 +17,9 @@ The browser also polls `/api/admin/browser-state` on load, when the tab becomes 
 
 - `/`: files from `public/`.
 - `/scramjet/`: Scramjet v2 runtime files from its installed package.
-- `/scramjet-controller/`: Scramjet v2 controller API, service worker, and injection scripts from the matching controller package.
-- `/libcurl/`: libcurl transport files from its installed package.
+- `/scramjet-v1/`: Scramjet v1.1.0 runtime files from `public/scram/`.
+- `/scramjet-controller/`: Scramjet v2 controller API, service worker, and injection scripts from `public/controller/`.
+- `/libcurl/`, `/baremux/`, and `/epoxy/`: transport assets for the selected runtime.
 - `/wisp/`: WebSocket transport endpoint, not a static directory.
 
 Unknown paths receive `public/404.html`.

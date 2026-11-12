@@ -361,6 +361,20 @@ textarea:focus-visible {
 	display: flex;
 	align-items: center;
 }
+.scramjet-version-picker {
+	display: flex;
+	align-items: center;
+}
+.scramjet-version-picker select {
+	max-width: 106px;
+	padding: 6px 7px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--field);
+	color: var(--field-text);
+	font: inherit;
+	font-size: 0.76rem;
+}
 .engine-trigger {
 	width: 31px;
 	height: 31px;

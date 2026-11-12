@@ -1,5 +1,6 @@
 "use strict";
-const stockSW = "./sw.js";
+const stockSW =
+	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "./sw-v1.js" : "./sw.js";
 
 /**
  * List of hostnames that are allowed to run serviceworkers on http://

@@ -19,6 +19,9 @@ const publicPath = fileURLToPath(new URL("../public/", import.meta.url));
 const libcurlPath = fileURLToPath(
 	new URL("../public/libcurl/", import.meta.url)
 );
+const legacyScramjetPath = fileURLToPath(
+	new URL("../public/scram/", import.meta.url)
+);
 const scramjetControllerPath = fileURLToPath(
 	new URL("../public/controller/", import.meta.url)
 );
@@ -638,6 +641,12 @@ fastify.register(fastifyStatic, {
 fastify.register(fastifyStatic, {
 	root: scramjetPath,
 	prefix: "/scramjet/",
+	decorateReply: false,
+});
+
+fastify.register(fastifyStatic, {
+	root: legacyScramjetPath,
+	prefix: "/scramjet-v1/",
 	decorateReply: false,
 });
 
