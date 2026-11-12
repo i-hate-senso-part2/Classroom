@@ -12,15 +12,17 @@ The prompt requires at least 12 characters and confirmation. Set the printed `AD
 
 The panel opens through its toolbar control or the Up, Down, Up, Down sequence. Authentication uses a signed HTTP-only cookie with an eight-hour lifetime. Five bad attempts from one IP trigger a 15-minute in-memory lockout.
 
-## Blocked setting persistence
+## Shared browser settings
 
 - Local, without KV configuration: `data/browser-state.json`.
-- With both KV URL and token: key `classroom:blocked` in the configured REST KV store.
+- With both KV URL and token: key `classroom:settings` in the configured REST KV store. The app reads the legacy `classroom:blocked` value if the new key is not present.
 - On Vercel: KV configuration is mandatory because function filesystems are ephemeral.
 
 Configure either both `KV_REST_API_URL` and `KV_REST_API_TOKEN`, or both supported `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` aliases. Partial configuration fails closed with an API error.
 
-The browser fetches this setting on startup and refreshes it periodically. When enabled, the public UI displays the blocked overlay.
+The admin panel can enable the public blocked screen, allow authenticated admins to bypass it, and post or clear a 500-character announcement popup. Admins can choose whether visitors can close it, set a per-visitor auto-close timer, and optionally set a global expiration time. Visitors see each announcement once until it is changed; authenticated admins do not see the popup, so a non-closeable announcement cannot lock them out of its controls. The blocked screen is cached per browser so a previously blocked visitor sees it immediately on refresh while the live setting is checked.
+
+The admin panel's "Refresh everyone else" action sends a shared refresh signal. Open pages poll the setting every 10 seconds, check whether they are blocked, and reload only if access is allowed. The admin page that sent the signal is excluded.
 
 ## Browser-local preferences
 

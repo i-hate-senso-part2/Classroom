@@ -11,7 +11,7 @@
 3. The page creates a v2 `Controller` with a `LibcurlClient` configured for the current host's `/wisp/` WebSocket path.
 4. Controller-managed frames and the v2 service worker handle proxied navigations; ordinary requests not claimed by Scramjet continue through the normal fetch path.
 
-The browser also polls `/api/browser-state` on load, when the tab becomes visible, and every minute to update the blocked overlay.
+The browser also polls `/api/browser-state` on load, when the tab becomes visible, and every 10 seconds to update the blocked overlay, announcement popup, and administrator refresh signal. A previous blocked value is cached locally so it can be displayed before the startup screen on refresh.
 
 ## Static mounts
 
@@ -25,4 +25,4 @@ Unknown paths receive `public/404.html`.
 
 ## Admin state flow
 
-Admin requests authenticate with a signed, HTTP-only `classroom_admin` cookie. The blocked setting is read and written through the configured KV REST API when available, or through `data/browser-state.json` for local non-Vercel runs. Detailed route and persistence behavior is in [the API reference](../reference/api.md) and [state operations](../operations/admin-state.md).
+Admin requests authenticate with a signed, HTTP-only `classroom_admin` cookie. The cookie is scoped to `/api` so the browser-state endpoint can apply administrator bypass. Shared browser settings are read and written through the configured KV REST API when available, or through `data/browser-state.json` for local non-Vercel runs. Detailed route and persistence behavior is in [the API reference](../reference/api.md) and [state operations](../operations/admin-state.md).

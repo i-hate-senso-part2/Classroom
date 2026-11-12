@@ -8,6 +8,13 @@
 		/>
 		<title>Classroom</title>
 		<link id="browser-favicon" rel="icon" href="/sj.png" />
+		<script>
+			try {
+				if (localStorage.getItem("classroom-blocked-state") === "true") {
+					document.documentElement.dataset.blockedAtStart = "true";
+				}
+			} catch {}
+		</script>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
@@ -242,7 +249,9 @@
 					</div>
 					<footer class="home-footer">
 						<p class="home-notice">
-							Do not use this service to bypass school, workplace, network, or content restrictions. Follow your organization's policies and local laws.
+							Do not use this service to bypass school, workplace, network, or
+							content restrictions. Follow your organization's policies and
+							local laws.
 						</p>
 					</footer>
 				</section>
@@ -301,14 +310,95 @@
 				<label class="setting-row" for="blocked-toggle"
 					><span
 						><strong>Blocked</strong
-						><small>Show the restriction screen to all visitors</small></span
+						><small>Show the restriction screen to visitors</small></span
 					><input id="blocked-toggle" type="checkbox"
 				/></label>
+				<label class="setting-row" for="admin-bypass-toggle"
+					><span
+						><strong>Admin bypass</strong
+						><small
+							>Let signed-in administrators through while blocked</small
+						></span
+					><input id="admin-bypass-toggle" type="checkbox"
+				/></label>
+				<label class="setting-row" for="announcement-dismissible"
+					><span
+						><strong>Visitors can close it</strong
+						><small>Show a close button on the announcement popup</small></span
+					><input id="announcement-dismissible" type="checkbox"
+				/></label>
+				<form id="admin-announcement-form">
+					<label for="admin-announcement">Popup announcement</label>
+					<textarea
+						id="admin-announcement"
+						rows="3"
+						maxlength="500"
+						placeholder="Write an update for everyone"
+					></textarea>
+					<label for="announcement-expires-at"
+						>Expire globally at (optional)</label
+					>
+					<input id="announcement-expires-at" type="datetime-local" />
+					<small class="admin-field-note"
+						>Uses your local time. Leave blank for no expiry.</small
+					>
+					<label for="announcement-auto-dismiss"
+						>Auto-close for each visitor</label
+					>
+					<select id="announcement-auto-dismiss">
+						<option value="0">Never</option>
+						<option value="5">After 5 seconds</option>
+						<option value="10">After 10 seconds</option>
+						<option value="15">After 15 seconds</option>
+						<option value="30">After 30 seconds</option>
+						<option value="60">After 1 minute</option>
+						<option value="120">After 2 minutes</option>
+					</select>
+					<div class="admin-actions">
+						<button
+							id="clear-announcement"
+							class="dialog-secondary"
+							type="button"
+						>
+							Clear
+						</button>
+						<button class="dialog-primary" type="submit">
+							Post announcement
+						</button>
+					</div>
+				</form>
+				<button id="refresh-all" class="dialog-secondary" type="button">
+					Refresh everyone else
+				</button>
 				<button id="admin-logout" class="dialog-secondary" type="button">
 					Sign out
 				</button>
 			</section>
 			<p id="admin-message" class="dialog-message" aria-live="polite"></p>
+		</dialog>
+		<dialog
+			id="announcement-dialog"
+			class="announcement-dialog"
+			aria-labelledby="announcement-title"
+		>
+			<div class="dialog-heading">
+				<div>
+					<span class="dialog-kicker">ANNOUNCEMENT</span>
+					<h2 id="announcement-title">A note for you</h2>
+				</div>
+				<button
+					id="announcement-dismiss"
+					class="icon-button"
+					type="button"
+					aria-label="Close announcement"
+					title="Close announcement"
+				>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<path d="m6 6 12 12M18 6 6 18" />
+					</svg>
+				</button>
+			</div>
+			<p id="announcement-message" class="announcement-message"></p>
 		</dialog>
 		<dialog
 			id="user-settings-dialog"

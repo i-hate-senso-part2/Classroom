@@ -16,7 +16,9 @@ dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 const publicPath = fileURLToPath(new URL("../public/", import.meta.url));
-const libcurlPath = fileURLToPath(new URL("../public/libcurl/", import.meta.url));
+const libcurlPath = fileURLToPath(
+	new URL("../public/libcurl/", import.meta.url)
+);
 const scramjetControllerPath = fileURLToPath(
 	new URL("../public/controller/", import.meta.url)
 );
@@ -44,14 +46,23 @@ const hasKvConfig = Boolean(kvRestUrl && kvRestToken);
 const hasPartialKvConfig = Boolean(kvRestUrl || kvRestToken) && !hasKvConfig;
 const loginAttempts = new Map();
 const adminSessionLifetime = 8 * 60 * 60 * 1000;
-let browserState = { blocked: false };
+const defaultBrowserState = {
+	blocked: false,
+	adminBypass: false,
+	announcement: "",
+	announcementId: "",
+	announcementDismissible: true,
+	announcementExpiresAt: null,
+	announcementAutoDismissSeconds: 0,
+	refreshToken: "",
+	refreshSource: "",
+};
+let browserState = { ...defaultBrowserState };
 
 try {
-	browserState = {
-		...browserState,
-		...JSON.parse(readFileSync(browserStatePath, "utf8")),
-	};
-	if (typeof browserState.blocked !== "boolean") browserState.blocked = false;
+	browserState = normalizeBrowserState(
+		JSON.parse(readFileSync(browserStatePath, "utf8"))
+	);
 } catch {}
 
 if (!adminPasswordConfig) {
@@ -60,11 +71,15 @@ if (!adminPasswordConfig) {
 	);
 }
 
-function sessionCookieOptions(request, maxAge = adminSessionLifetime / 1000) {
+function sessionCookieOptions(
+	request,
+	maxAge = adminSessionLifetime / 1000,
+	path = "/api"
+) {
 	const secure =
 		request.protocol === "https" ||
 		request.headers["x-forwarded-proto"] === "https";
-	return `HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+	return `HttpOnly; SameSite=Strict; Path=${path}; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
 }
 
 function getAdminSession(request) {
@@ -132,31 +147,104 @@ async function kvCommand(command, ...args) {
 	return payload.result;
 }
 
-async function readBlockedState() {
-	assertStateStorageAvailable();
-	if (!hasKvConfig) return browserState.blocked;
-	const value = await kvCommand("GET", "classroom:blocked");
-	if (value !== null && value !== "0" && value !== "1") {
+function normalizeBrowserState(state) {
+	if (!state || typeof state !== "object" || Array.isArray(state)) {
+		throw new Error("Stored browser settings are invalid.");
+	}
+	if (state.blocked !== undefined && typeof state.blocked !== "boolean") {
 		throw new Error("Stored blocked setting is invalid.");
 	}
-	return value === "1";
+	if (
+		state.adminBypass !== undefined &&
+		typeof state.adminBypass !== "boolean"
+	) {
+		throw new Error("Stored administrator bypass setting is invalid.");
+	}
+	if (
+		state.announcement !== undefined &&
+		(typeof state.announcement !== "string" || state.announcement.length > 500)
+	) {
+		throw new Error("Stored announcement is invalid.");
+	}
+	if (
+		state.announcementId !== undefined &&
+		(typeof state.announcementId !== "string" ||
+			state.announcementId.length > 100)
+	) {
+		throw new Error("Stored announcement identifier is invalid.");
+	}
+	if (
+		state.announcementDismissible !== undefined &&
+		typeof state.announcementDismissible !== "boolean"
+	) {
+		throw new Error("Stored announcement close setting is invalid.");
+	}
+	if (
+		state.announcementExpiresAt !== undefined &&
+		state.announcementExpiresAt !== null &&
+		(!Number.isSafeInteger(state.announcementExpiresAt) ||
+			state.announcementExpiresAt <= 0)
+	) {
+		throw new Error("Stored announcement expiry is invalid.");
+	}
+	if (
+		state.announcementAutoDismissSeconds !== undefined &&
+		![0, 5, 10, 15, 30, 60, 120].includes(state.announcementAutoDismissSeconds)
+	) {
+		throw new Error("Stored announcement auto-close setting is invalid.");
+	}
+	return {
+		...defaultBrowserState,
+		...state,
+	};
 }
 
-function persistBrowserState(blocked) {
+async function readBrowserState() {
+	assertStateStorageAvailable();
+	if (!hasKvConfig) return browserState;
+	const stored = await kvCommand("GET", "classroom:settings");
+	if (stored !== null) {
+		try {
+			return normalizeBrowserState(JSON.parse(stored));
+		} catch (error) {
+			throw new Error(
+				`Could not read stored browser settings: ${error.message}`
+			);
+		}
+	}
+	const legacyBlocked = await kvCommand("GET", "classroom:blocked");
+	if (
+		legacyBlocked !== null &&
+		legacyBlocked !== "0" &&
+		legacyBlocked !== "1"
+	) {
+		throw new Error("Stored blocked setting is invalid.");
+	}
+	return { ...defaultBrowserState, blocked: legacyBlocked === "1" };
+}
+
+function persistBrowserState(state) {
 	mkdirSync(dirname(browserStatePath), { recursive: true });
-	writeFileSync(browserStatePath, `${JSON.stringify({ blocked }, null, 2)}\n`, {
+	writeFileSync(browserStatePath, `${JSON.stringify(state, null, 2)}\n`, {
 		mode: 0o600,
 	});
 }
 
-async function saveBlockedState(blocked) {
+async function saveBrowserState(state) {
 	assertStateStorageAvailable();
 	if (hasKvConfig) {
-		await kvCommand("SET", "classroom:blocked", blocked ? "1" : "0");
+		await kvCommand("SET", "classroom:settings", JSON.stringify(state));
 	} else {
-		persistBrowserState(blocked);
+		persistBrowserState(state);
 	}
-	browserState.blocked = blocked;
+	browserState = state;
+}
+
+async function updateBrowserState(updates) {
+	const state = await readBrowserState();
+	const updated = normalizeBrowserState({ ...state, ...updates });
+	await saveBrowserState(updated);
+	return updated;
 }
 
 async function verifyAdminPassword(password) {
@@ -195,9 +283,27 @@ export const fastify = Fastify({
 
 fastify.get("/api/browser-state", async (request, reply) => {
 	try {
-		return reply
-			.header("Cache-Control", "no-store")
-			.send({ blocked: await readBlockedState() });
+		const state = await readBrowserState();
+		const isAdmin = getAdminSession(request);
+		const announcementExpired =
+			state.announcementExpiresAt !== null &&
+			state.announcementExpiresAt <= Date.now();
+		const announcement = announcementExpired ? "" : state.announcement;
+		return reply.header("Cache-Control", "no-store").send({
+			blocked: state.blocked && !(state.adminBypass && isAdmin),
+			isAdmin,
+			announcement,
+			announcementId: announcement
+				? state.announcementId || state.announcement
+				: "",
+			announcementDismissible: state.announcementDismissible,
+			announcementExpiresAt: announcementExpired
+				? null
+				: state.announcementExpiresAt,
+			announcementAutoDismissSeconds: state.announcementAutoDismissSeconds,
+			refreshToken: state.refreshToken,
+			refreshSource: state.refreshSource,
+		});
 	} catch (error) {
 		request.log.error(error);
 		return reply.code(503).send({ error: error.message });
@@ -231,10 +337,10 @@ fastify.post("/api/admin/login", async (request, reply) => {
 	const { token, expiresAt } = createAdminSession();
 	const maxAge = Math.floor((expiresAt - Date.now()) / 1000);
 	return reply
-		.header(
-			"Set-Cookie",
-			`classroom_admin=${token}; ${sessionCookieOptions(request, maxAge)}`
-		)
+		.header("Set-Cookie", [
+			`classroom_admin=${token}; ${sessionCookieOptions(request, maxAge)}`,
+			`classroom_admin=; ${sessionCookieOptions(request, 0, "/api/admin")}`,
+		])
 		.send({ authenticated: true });
 });
 
@@ -242,9 +348,15 @@ fastify.get("/api/admin/state", async (request, reply) => {
 	if (!getAdminSession(request))
 		return reply.code(401).send({ error: "Admin sign-in required." });
 	try {
-		return reply
-			.header("Cache-Control", "no-store")
-			.send({ blocked: await readBlockedState() });
+		const state = await readBrowserState();
+		return reply.header("Cache-Control", "no-store").send({
+			blocked: state.blocked,
+			adminBypass: state.adminBypass,
+			announcement: state.announcement,
+			announcementDismissible: state.announcementDismissible,
+			announcementExpiresAt: state.announcementExpiresAt,
+			announcementAutoDismissSeconds: state.announcementAutoDismissSeconds,
+		});
 	} catch (error) {
 		request.log.error(error);
 		return reply.code(503).send({ error: error.message });
@@ -265,12 +377,115 @@ fastify.post("/api/admin/blocked", async (request, reply) => {
 		return reply.code(400).send({ error: "Blocked must be true or false." });
 	}
 	try {
-		await saveBlockedState(request.body.blocked);
+		const state = await updateBrowserState({
+			blocked: request.body.blocked,
+		});
+		return reply.send({ blocked: state.blocked });
 	} catch (error) {
 		request.log.error(error);
 		return reply.code(503).send({ error: error.message });
 	}
-	return reply.send({ blocked: browserState.blocked });
+});
+
+fastify.post("/api/admin/bypass", async (request, reply) => {
+	if (!getAdminSession(request))
+		return reply.code(401).send({ error: "Admin sign-in required." });
+	if (typeof request.body?.adminBypass !== "boolean") {
+		return reply
+			.code(400)
+			.send({ error: "Admin bypass must be true or false." });
+	}
+	try {
+		const state = await updateBrowserState({
+			adminBypass: request.body.adminBypass,
+		});
+		return reply.send({ adminBypass: state.adminBypass });
+	} catch (error) {
+		request.log.error(error);
+		return reply.code(503).send({ error: error.message });
+	}
+});
+
+fastify.post("/api/admin/announcement", async (request, reply) => {
+	if (!getAdminSession(request))
+		return reply.code(401).send({ error: "Admin sign-in required." });
+	const announcement = request.body?.announcement;
+	const dismissible = request.body?.dismissible;
+	const expiresAt = request.body?.expiresAt;
+	const autoDismissSeconds = request.body?.autoDismissSeconds;
+	if (typeof announcement !== "string" || announcement.length > 500) {
+		return reply.code(400).send({
+			error: "Announcement must be text with at most 500 characters.",
+		});
+	}
+	if (typeof dismissible !== "boolean") {
+		return reply
+			.code(400)
+			.send({ error: "Dismissible must be true or false." });
+	}
+	if (
+		expiresAt !== null &&
+		(typeof expiresAt !== "string" ||
+			!Number.isFinite(Date.parse(expiresAt)) ||
+			Date.parse(expiresAt) <= Date.now())
+	) {
+		return reply.code(400).send({
+			error: "Announcement expiry must be a future date and time or empty.",
+		});
+	}
+	if (![0, 5, 10, 15, 30, 60, 120].includes(autoDismissSeconds)) {
+		return reply.code(400).send({
+			error: "Auto-close must be 0, 5, 10, 15, 30, 60, or 120 seconds.",
+		});
+	}
+	try {
+		const state = await updateBrowserState({
+			announcement: announcement.trim(),
+			announcementId: announcement.trim()
+				? randomBytes(16).toString("hex")
+				: "",
+			announcementDismissible: announcement.trim() ? dismissible : true,
+			announcementExpiresAt:
+				announcement.trim() && expiresAt ? Date.parse(expiresAt) : null,
+			announcementAutoDismissSeconds: announcement.trim()
+				? autoDismissSeconds
+				: 0,
+		});
+		return reply.send({
+			announcement: state.announcement,
+			announcementId: state.announcementId,
+		});
+	} catch (error) {
+		request.log.error(error);
+		return reply.code(503).send({ error: error.message });
+	}
+});
+
+fastify.post("/api/admin/refresh", async (request, reply) => {
+	if (!getAdminSession(request))
+		return reply.code(401).send({ error: "Admin sign-in required." });
+	const sourceId = request.body?.sourceId;
+	if (typeof sourceId !== "string" || !/^[\da-z-]{1,80}$/i.test(sourceId)) {
+		return reply
+			.code(400)
+			.send({ error: "A valid browser identifier is required." });
+	}
+	try {
+		const currentState = await readBrowserState();
+		const state = normalizeBrowserState({
+			...currentState,
+			refreshToken: randomBytes(16).toString("hex"),
+			refreshSource: sourceId,
+		});
+		await saveBrowserState(state);
+		return reply.send({
+			blocked: currentState.blocked,
+			refreshToken: state.refreshToken,
+		});
+	} catch (error) {
+		request.log.error(error);
+		return reply.code(503).send({ error: error.message });
+	}
 });
 
 fastify.post("/api/admin/logout", async (request, reply) => {
@@ -279,10 +494,10 @@ fastify.post("/api/admin/logout", async (request, reply) => {
 		.map((part) => part.trim())
 		.find((part) => part.startsWith("classroom_admin="));
 	return reply
-		.header(
-			"Set-Cookie",
-			`classroom_admin=; ${sessionCookieOptions(request, 0)}`
-		)
+		.header("Set-Cookie", [
+			`classroom_admin=; ${sessionCookieOptions(request, 0)}`,
+			`classroom_admin=; ${sessionCookieOptions(request, 0, "/api/admin")}`,
+		])
 		.send({ authenticated: false });
 });
 

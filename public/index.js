@@ -32,8 +32,27 @@ const progress = document.getElementById("browser-progress");
 const quickLinks = document.getElementById("quick-links");
 const startupScreen = document.getElementById("startup-screen");
 const adminDialog = document.getElementById("admin-dialog");
+const announcementDialog = document.getElementById("announcement-dialog");
+const announcementMessage = document.getElementById("announcement-message");
+const announcementDismissButton = document.getElementById(
+	"announcement-dismiss"
+);
 const userSettingsDialog = document.getElementById("user-settings-dialog");
 const blockedOverlay = document.getElementById("blocked-overlay");
+const browserClientId =
+	window.crypto?.randomUUID?.() ||
+	`${Date.now()}-${Math.random().toString(16).slice(2)}`;
+let lastRefreshToken = null;
+let currentAnnouncementId = "";
+let announcementDismissible = true;
+let announcementAutoDismissTimer = null;
+let seenAnnouncementId = (() => {
+	try {
+		return localStorage.getItem("classroom-seen-announcement") || "";
+	} catch {
+		return "";
+	}
+})();
 const fullscreenToggle = document.getElementById("fullscreen-toggle");
 const fullscreenExit = document.getElementById("fullscreen-exit");
 const picker = document.querySelector(".engine-picker");
@@ -411,6 +430,23 @@ async function refreshAdminPanel() {
 		form.hidden = true;
 		settings.hidden = false;
 		document.getElementById("blocked-toggle").checked = result.blocked;
+		document.getElementById("admin-bypass-toggle").checked = result.adminBypass;
+		document.getElementById("admin-announcement").value =
+			result.announcement || "";
+		document.getElementById("announcement-dismissible").checked =
+			result.announcementDismissible !== false;
+		document.getElementById("announcement-expires-at").value =
+			typeof result.announcementExpiresAt === "number"
+				? new Date(
+						result.announcementExpiresAt -
+							new Date(result.announcementExpiresAt).getTimezoneOffset() * 60000
+					)
+						.toISOString()
+						.slice(0, 16)
+				: "";
+		document.getElementById("announcement-auto-dismiss").value = String(
+			result.announcementAutoDismissSeconds || 0
+		);
 		message.textContent = "Administrator access verified.";
 	} catch (err) {
 		form.hidden = false;
@@ -421,15 +457,120 @@ async function refreshAdminPanel() {
 	}
 }
 
+function closeAnnouncement() {
+	window.clearTimeout(announcementAutoDismissTimer);
+	announcementAutoDismissTimer = null;
+	if (announcementDialog.open) announcementDialog.close();
+}
+
+function markAnnouncementSeen(id) {
+	seenAnnouncementId = id;
+	try {
+		localStorage.setItem("classroom-seen-announcement", id);
+	} catch {}
+}
+
+function dismissAnnouncement() {
+	if (currentAnnouncementId) {
+		markAnnouncementSeen(currentAnnouncementId);
+	}
+	closeAnnouncement();
+}
+
+function syncAnnouncement(state, blocked) {
+	const message =
+		typeof state.announcement === "string" ? state.announcement.trim() : "";
+	const id =
+		typeof state.announcementId === "string" && state.announcementId
+			? state.announcementId
+			: message;
+	const expiresAt =
+		typeof state.announcementExpiresAt === "number"
+			? state.announcementExpiresAt
+			: null;
+	if (
+		blocked ||
+		state.isAdmin === true ||
+		!message ||
+		!id ||
+		(expiresAt !== null && expiresAt <= Date.now())
+	) {
+		closeAnnouncement();
+		currentAnnouncementId = "";
+		return;
+	}
+
+	const changed = id !== currentAnnouncementId;
+	if (changed) {
+		window.clearTimeout(announcementAutoDismissTimer);
+		announcementMessage.textContent = message;
+		currentAnnouncementId = id;
+	}
+	announcementDismissible = state.announcementDismissible !== false;
+	announcementDismissButton.hidden = !announcementDismissible;
+
+	if (seenAnnouncementId === id && !announcementDialog.open) {
+		closeAnnouncement();
+		return;
+	}
+	if (!announcementDialog.open) {
+		announcementDialog.showModal();
+		markAnnouncementSeen(id);
+	}
+	if (changed) {
+		const seconds = Number(state.announcementAutoDismissSeconds) || 0;
+		const durations = [];
+		if (seconds > 0) durations.push(seconds * 1000);
+		if (expiresAt !== null) durations.push(expiresAt - Date.now());
+		if (durations.length > 0) {
+			announcementAutoDismissTimer = window.setTimeout(
+				() => {
+					if (expiresAt !== null && Date.now() >= expiresAt) {
+						closeAnnouncement();
+					} else {
+						dismissAnnouncement();
+					}
+				},
+				Math.min(...durations)
+			);
+		}
+	}
+}
+
 async function refreshBlockedState() {
 	try {
 		const response = await fetch("/api/browser-state", { cache: "no-store" });
-		if (!response.ok) return false;
-		const { blocked } = await response.json();
+		if (!response.ok) {
+			return document.documentElement.hasAttribute("data-blocked-at-start");
+		}
+		const state = await response.json();
+		const { blocked, refreshToken, refreshSource } = state;
+		if (typeof blocked !== "boolean") {
+			return document.documentElement.hasAttribute("data-blocked-at-start");
+		}
 		blockedOverlay.hidden = !blocked;
+		document.documentElement.toggleAttribute("data-blocked-at-start", blocked);
+		syncAnnouncement(state, blocked);
+		try {
+			if (blocked) {
+				localStorage.setItem("classroom-blocked-state", "true");
+			} else {
+				localStorage.removeItem("classroom-blocked-state");
+			}
+		} catch {}
+		const nextRefreshToken =
+			typeof refreshToken === "string" ? refreshToken : "";
+		if (lastRefreshToken === null) {
+			lastRefreshToken = nextRefreshToken;
+		} else if (nextRefreshToken !== lastRefreshToken) {
+			lastRefreshToken = nextRefreshToken;
+			if (nextRefreshToken && refreshSource !== browserClientId && !blocked) {
+				window.location.reload();
+			}
+		}
 		return blocked;
 	} catch {
-		return false;
+		return document.documentElement.hasAttribute("data-blocked-at-start");
 	}
 }
 
@@ -778,6 +919,18 @@ async function toggleFullscreen() {
 fullscreenToggle.addEventListener("click", toggleFullscreen);
 fullscreenExit.addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", updateFullscreenState);
+announcementDismissButton.addEventListener("click", dismissAnnouncement);
+announcementDialog.addEventListener("cancel", (event) => {
+	event.preventDefault();
+	if (announcementDismissible) dismissAnnouncement();
+});
+window.addEventListener("storage", (event) => {
+	if (event.key !== "classroom-seen-announcement") return;
+	seenAnnouncementId = event.newValue || "";
+	if (seenAnnouncementId === currentAnnouncementId && announcementDialog.open) {
+		closeAnnouncement();
+	}
+});
 
 document
 	.getElementById("admin-open")
@@ -797,6 +950,7 @@ document
 			});
 			password.value = "";
 			await refreshAdminPanel();
+			await refreshBlockedState();
 		} catch (err) {
 			showAdminMessage(err.message, true);
 		}
@@ -816,10 +970,89 @@ document
 			showAdminMessage(err.message, true);
 		}
 	});
+document
+	.getElementById("admin-bypass-toggle")
+	.addEventListener("change", async (event) => {
+		try {
+			await adminRequest("/api/admin/bypass", {
+				method: "POST",
+				body: JSON.stringify({ adminBypass: event.target.checked }),
+			});
+			await refreshBlockedState();
+			showAdminMessage("Administrator bypass updated.");
+		} catch (err) {
+			event.target.checked = !event.target.checked;
+			showAdminMessage(err.message, true);
+		}
+	});
+document
+	.getElementById("admin-announcement-form")
+	.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		const input = document.getElementById("admin-announcement");
+		const expiry = document.getElementById("announcement-expires-at").value;
+		try {
+			await adminRequest("/api/admin/announcement", {
+				method: "POST",
+				body: JSON.stringify({
+					announcement: input.value,
+					dismissible: document.getElementById("announcement-dismissible")
+						.checked,
+					expiresAt: expiry ? new Date(expiry).toISOString() : null,
+					autoDismissSeconds: Number(
+						document.getElementById("announcement-auto-dismiss").value
+					),
+				}),
+			});
+			await refreshBlockedState();
+			showAdminMessage(
+				input.value.trim()
+					? "Announcement popup posted."
+					: "Announcement popup cleared."
+			);
+		} catch (err) {
+			showAdminMessage(err.message, true);
+		}
+	});
+document
+	.getElementById("clear-announcement")
+	.addEventListener("click", async () => {
+		const input = document.getElementById("admin-announcement");
+		input.value = "";
+		document.getElementById("announcement-dismissible").checked = true;
+		document.getElementById("announcement-expires-at").value = "";
+		document.getElementById("announcement-auto-dismiss").value = "0";
+		document.getElementById("admin-announcement-form").requestSubmit();
+	});
+document.getElementById("refresh-all").addEventListener("click", async () => {
+	if (
+		!window.confirm(
+			"Refresh other open Classroom pages? Their current pages may be interrupted."
+		)
+	) {
+		return;
+	}
+	try {
+		const result = await adminRequest("/api/admin/refresh", {
+			method: "POST",
+			body: JSON.stringify({ sourceId: browserClientId }),
+		});
+		lastRefreshToken = result.refreshToken;
+		await refreshBlockedState();
+		showAdminMessage(
+			result.blocked
+				? "Refresh sent. Blocked visitors will see the restriction screen."
+				: "Refresh sent. Other open pages will refresh within 10 seconds."
+		);
+	} catch (err) {
+		showAdminMessage(err.message, true);
+	}
+});
 document.getElementById("admin-logout").addEventListener("click", async () => {
 	try {
 		await adminRequest("/api/admin/logout", { method: "POST" });
 		await refreshAdminPanel();
+		await refreshBlockedState();
 	} catch (err) {
 		showAdminMessage(err.message, true);
 	}
@@ -911,7 +1144,7 @@ async function finishStartup() {
 }
 
 finishStartup();
-window.setInterval(refreshBlockedState, 60000);
+window.setInterval(refreshBlockedState, 10000);
 document.addEventListener("visibilitychange", () => {
 	if (!document.hidden) refreshBlockedState();
 });
