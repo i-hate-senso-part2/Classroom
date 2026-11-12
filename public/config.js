@@ -1,7 +1,7 @@
 (function configureScramjetApp(window) {
   const publicWispEndpoints = Object.freeze([
-    "wss://://onrender.com",
-  ]);
+	"wss://wisp-server-python-nh0a.onrender.com/",
+]);
 
 	let endpointCursor = -1;
 
