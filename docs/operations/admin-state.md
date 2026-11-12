@@ -20,7 +20,7 @@ The panel opens through its toolbar control or the Up, Down, Up, Down sequence. 
 
 Configure either both `KV_REST_API_URL` and `KV_REST_API_TOKEN`, or both supported `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` aliases. Partial configuration fails closed with an API error.
 
-The admin panel can enable the public blocked screen, allow authenticated admins to bypass it, and schedule an automatic unblock time. The server clears an expired block on the next state request.
+The admin panel can enable the public blocked screen, allow authenticated admins to bypass it, and schedule an automatic unblock time. The browser requests a state update at the scheduled deadline, and the server clears expired blocks on state requests as a fallback.
 
 Admins can post or clear a 500-character announcement popup, choose whether visitors can close it, set a per-visitor auto-close timer, and optionally set a global expiration time. A preview is local to the admin session. Visitors see each announcement once until it is changed; authenticated admins do not see published popups.
 

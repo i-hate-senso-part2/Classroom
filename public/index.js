@@ -44,6 +44,7 @@ const announcementDismissButton = document.getElementById(
 );
 const userSettingsDialog = document.getElementById("user-settings-dialog");
 const blockedOverlay = document.getElementById("blocked-overlay");
+let blockExpiryTimer = null;
 const browserClientId =
 	window.crypto?.randomUUID?.() ||
 	`${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -589,6 +590,21 @@ function closeAnnouncementPreview() {
 	void refreshBlockedState();
 }
 
+function scheduleBlockExpiryCheck(blockedUntil) {
+	window.clearTimeout(blockExpiryTimer);
+	blockExpiryTimer = null;
+	if (!Number.isSafeInteger(blockedUntil) || blockedUntil <= Date.now()) return;
+
+	const delay = Math.min(blockedUntil - Date.now(), 2_147_483_647);
+	blockExpiryTimer = window.setTimeout(() => {
+		if (Date.now() < blockedUntil) {
+			scheduleBlockExpiryCheck(blockedUntil);
+			return;
+		}
+		void refreshBlockedState();
+	}, delay);
+}
+
 function markAnnouncementSeen(id) {
 	seenAnnouncementId = id;
 	try {
@@ -673,10 +689,15 @@ async function refreshBlockedState() {
 			return document.documentElement.hasAttribute("data-blocked-at-start");
 		}
 		const state = await response.json();
-		const { blocked, refreshToken, refreshSource } = state;
-		if (typeof blocked !== "boolean") {
+		const { refreshToken, refreshSource } = state;
+		if (typeof state.blocked !== "boolean") {
 			return document.documentElement.hasAttribute("data-blocked-at-start");
 		}
+		const blockExpired =
+			Number.isSafeInteger(state.blockedUntil) &&
+			state.blockedUntil <= Date.now();
+		const blocked = state.blocked && !blockExpired;
+		scheduleBlockExpiryCheck(blocked ? state.blockedUntil : null);
 		const incomingSharedLinks = Array.isArray(state.sharedLinks)
 			? state.sharedLinks
 			: [];
