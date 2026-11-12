@@ -338,7 +338,7 @@ export const fastify = Fastify({
 	},
 });
 
-fastify.get("/api/browser-state", async (request, reply) => {
+async function sendBrowserState(request, reply) {
 	try {
 		const state = await readCurrentBrowserState();
 		const isAdmin = getAdminSession(request);
@@ -367,7 +367,10 @@ fastify.get("/api/browser-state", async (request, reply) => {
 		request.log.error(error);
 		return reply.code(503).send({ error: error.message });
 	}
-});
+}
+
+fastify.get("/api/browser-state", sendBrowserState);
+fastify.get("/api/admin/browser-state", sendBrowserState);
 
 fastify.post("/api/admin/login", async (request, reply) => {
 	if (!adminPasswordConfig) {

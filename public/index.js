@@ -637,7 +637,9 @@ function syncAnnouncement(state, blocked) {
 
 async function refreshBlockedState() {
 	try {
-		const response = await fetch("/api/browser-state", { cache: "no-store" });
+		const response = await fetch("/api/admin/browser-state", {
+			cache: "no-store",
+		});
 		if (!response.ok) {
 			return document.documentElement.hasAttribute("data-blocked-at-start");
 		}

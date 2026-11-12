@@ -11,7 +11,7 @@
 3. The page creates a v2 `Controller` with a `LibcurlClient` configured for the current host's `/wisp/` WebSocket path.
 4. Controller-managed frames and the v2 service worker handle proxied navigations; ordinary requests not claimed by Scramjet continue through the normal fetch path.
 
-The browser also polls `/api/browser-state` on load, when the tab becomes visible, and every 10 seconds to update the blocked overlay, announcement popup, shared homepage links, and administrator refresh signal. A previous blocked value is cached locally so it can be displayed before the startup screen on refresh. Expired timed blocks are cleared on state reads.
+The browser also polls `/api/admin/browser-state` on load, when the tab becomes visible, and every 10 seconds to update the blocked overlay, announcement popup, shared homepage links, and administrator refresh signal. This endpoint is under `/api/admin` so it receives both current and older path-scoped admin cookies. A previous blocked value is cached locally so it can be displayed before the startup screen on refresh. Expired timed blocks are cleared on state reads.
 
 ## Static mounts
 
