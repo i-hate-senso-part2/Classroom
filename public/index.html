@@ -196,11 +196,11 @@
 								<img src="sj.png" alt="" />
 								<div>
 									<span class="home-kicker">CLASSROOM</span>
-									<span class="home-edition">A fresh start, every tab.</span>
+									<span class="home-edition">Your browser, ready.</span>
 								</div>
 							</div>
-							<h1>What are you<br />looking for?</h1>
-							<p class="home-intro">Make a little room for curiosity.</p>
+							<h1>Where to next?</h1>
+							<p class="home-intro">Search the web or open a shortcut.</p>
 							<form id="home-search-form" class="home-search" role="search">
 								<svg viewBox="0 0 24 24" aria-hidden="true">
 									<circle cx="10.8" cy="10.8" r="6.3" />
@@ -224,8 +224,8 @@
 						</section>
 						<section class="home-shortcuts" aria-label="Quick access">
 							<div class="home-section-heading">
-								<h2>Pick up where you like</h2>
-								<span>SHORTCUTS</span>
+								<h2>Quick links</h2>
+								<span>YOUR SHORTCUTS</span>
 							</div>
 							<div
 								id="quick-links"
@@ -313,7 +313,7 @@
 		>
 			<div class="dialog-heading">
 				<div>
-					<span class="dialog-kicker">YOUR CLASSROOM</span>
+					<span class="dialog-kicker">PREFERENCES</span>
 					<h2 id="user-settings-title">Personalize</h2>
 				</div>
 				<button
@@ -332,18 +332,11 @@
 				<label for="theme-select">Theme</label>
 				<div class="theme-select-row">
 					<select id="theme-select" aria-label="Theme">
-						<option value="moss">Moss</option>
-						<option value="sunset">Sunset</option>
-						<option value="ocean">Ocean</option>
-						<option value="midnight">Midnight</option>
+						<option value="moss">Fern</option>
+						<option value="midnight">Slate</option>
+						<option value="sunset">Ember</option>
+						<option value="ocean">Tide</option>
 					</select>
-					<button
-						id="create-custom-theme"
-						class="dialog-secondary"
-						type="button"
-					>
-						New theme
-					</button>
 				</div>
 				<label for="background-select">Home background</label>
 				<select id="background-select">
@@ -377,35 +370,6 @@
 					<option value="geforce">Google Classroom</option>
 					<option value="tiktok">TikTok</option>
 				</select>
-				<fieldset
-					id="custom-theme-controls"
-					class="custom-theme-controls"
-					hidden
-				>
-					<legend>Custom theme</legend>
-					<label for="custom-theme-name">Theme name</label>
-					<input
-						id="custom-theme-name"
-						type="text"
-						maxlength="28"
-						placeholder="My theme"
-					/>
-					<label for="custom-background-color">Page background</label>
-					<input id="custom-background-color" type="color" value="#e5eee6" />
-					<label for="custom-surface-color">Toolbar and surfaces</label>
-					<input id="custom-surface-color" type="color" value="#f1f5ef" />
-					<label for="custom-accent-color">Accent</label>
-					<input id="custom-accent-color" type="color" value="#c3e957" />
-					<label for="custom-text-color">Text</label>
-					<input id="custom-text-color" type="color" value="#1b3024" />
-					<button
-						id="delete-custom-theme"
-						class="dialog-secondary"
-						type="button"
-					>
-						Delete theme
-					</button>
-				</fieldset>
 				<div class="settings-actions">
 					<button
 						id="user-settings-reset"

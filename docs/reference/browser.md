@@ -11,9 +11,9 @@ The UI is a single static page served from `public/`. Browser features are imple
 
 ## Preferences
 
-- Built-in themes, up to 20 named custom themes, home background style or uploaded image, and default tab appearance are saved as `classroom-user-settings` in local storage. Uploaded images are resized and stored on this device only.
+- Four dark-only color palettes, home background style or uploaded image, and default tab appearance are saved as `classroom-user-settings` in local storage. Uploaded images are resized and stored on this device only.
 - Bookmarks are saved as `classroom-bookmarks` in local storage.
-- User settings preview changes before saving; closing without saving restores the last saved preferences. Reset restores the default palette and appearance.
+- User settings preview changes before saving; closing without saving restores the last saved preferences. Reset restores the default dark palette and appearance.
 - The fullscreen control hides browser chrome; use its floating exit button or press `Escape` to leave fullscreen.
 - The saved default tab appearance updates open and future tabs' visible title and icon only. It does not alter network requests or conceal activity from the server/device administrator.
 - The admin panel opens after the Up, Down, Up, Down arrow sequence, or through the admin control.

@@ -74,13 +74,6 @@ const DEFAULT_USER_SETTINGS = Object.freeze({
 	background: "grid",
 	defaultCloak: "normal",
 	backgroundImage: "",
-	customThemes: Object.freeze([]),
-	defaultCustomTheme: Object.freeze({
-		background: "#e5eee6",
-		surface: "#f1f5ef",
-		accent: "#c3e957",
-		text: "#1b3024",
-	}),
 });
 const BUILT_IN_THEMES = new Set(["moss", "sunset", "ocean", "midnight"]);
 const HOME_BACKGROUNDS = new Set(["grid", "lines", "plain", "image"]);
@@ -103,86 +96,14 @@ try {
 	bookmarks = [];
 }
 
-function validColor(value, fallback) {
-	return typeof value === "string" && /^#[\da-f]{6}$/i.test(value)
-		? value
-		: fallback;
-}
-
-function sanitizeCustomThemes(themes) {
-	if (!Array.isArray(themes)) return [];
-	return themes
-		.filter(
-			(theme) =>
-				theme &&
-				typeof theme.id === "string" &&
-				theme.id.startsWith("custom-") &&
-				typeof theme.name === "string"
-		)
-		.slice(0, 20)
-		.map((theme) => ({
-			id: theme.id,
-			name: theme.name.trim().slice(0, 28) || "Custom theme",
-			colors: {
-				background: validColor(
-					theme.colors?.background,
-					DEFAULT_USER_SETTINGS.defaultCustomTheme.background
-				),
-				surface: validColor(
-					theme.colors?.surface,
-					DEFAULT_USER_SETTINGS.defaultCustomTheme.surface
-				),
-				accent: validColor(
-					theme.colors?.accent,
-					DEFAULT_USER_SETTINGS.defaultCustomTheme.accent
-				),
-				text: validColor(
-					theme.colors?.text,
-					DEFAULT_USER_SETTINGS.defaultCustomTheme.text
-				),
-			},
-		}));
-}
-
 function loadUserSettings() {
 	try {
 		const stored = JSON.parse(
 			localStorage.getItem("classroom-user-settings") || "null"
 		);
 		if (stored && typeof stored === "object") {
-			const customThemes = sanitizeCustomThemes(stored.customThemes);
-			if (stored.customTheme && customThemes.length === 0) {
-				customThemes.push({
-					id: "custom-default",
-					name: "My theme",
-					colors: {
-						background: validColor(
-							stored.customTheme.background,
-							DEFAULT_USER_SETTINGS.defaultCustomTheme.background
-						),
-						surface: validColor(
-							stored.customTheme.surface,
-							DEFAULT_USER_SETTINGS.defaultCustomTheme.surface
-						),
-						accent: validColor(
-							stored.customTheme.accent,
-							DEFAULT_USER_SETTINGS.defaultCustomTheme.accent
-						),
-						text: validColor(
-							stored.customTheme.text,
-							DEFAULT_USER_SETTINGS.defaultCustomTheme.text
-						),
-					},
-				});
-			}
-			const storedTheme =
-				stored.theme === "custom" ? "custom-default" : stored.theme;
 			return {
-				theme:
-					BUILT_IN_THEMES.has(storedTheme) ||
-					customThemes.some((theme) => theme.id === storedTheme)
-						? storedTheme
-						: "moss",
+				theme: BUILT_IN_THEMES.has(stored.theme) ? stored.theme : "moss",
 				background: HOME_BACKGROUNDS.has(stored.background)
 					? stored.background
 					: "grid",
@@ -194,20 +115,15 @@ function loadUserSettings() {
 					IMAGE_DATA_URL.test(stored.backgroundImage)
 						? stored.backgroundImage
 						: "",
-				customThemes,
 			};
 		}
 		const previousTheme = localStorage.getItem("classroom-theme");
 		return {
 			...DEFAULT_USER_SETTINGS,
 			theme: previousTheme === "dark" ? "midnight" : "moss",
-			customThemes: [],
 		};
 	} catch {
-		return {
-			...DEFAULT_USER_SETTINGS,
-			customThemes: [],
-		};
+		return { ...DEFAULT_USER_SETTINGS };
 	}
 }
 
@@ -355,46 +271,6 @@ function syncBrowser() {
 	renderTabs();
 }
 
-const CUSTOM_THEME_PROPERTIES = [
-	"--background",
-	"--chrome",
-	"--chrome-raised",
-	"--tab-inactive",
-	"--text",
-	"--muted",
-	"--home-muted",
-	"--accent",
-	"--accent-warm",
-	"--hover",
-	"--field",
-	"--menu",
-	"--menu-active",
-	"--field-text",
-	"--home",
-	"--home-title",
-	"--home-card",
-	"--home-icon",
-	"--line",
-	"--home-card-border",
-	"--home-grid",
-	"--surface-shadow",
-];
-
-function renderThemeOptions(settings) {
-	const select = document.getElementById("theme-select");
-	select
-		.querySelectorAll("[data-custom-theme]")
-		.forEach((option) => option.remove());
-	for (const theme of settings.customThemes) {
-		const option = document.createElement("option");
-		option.value = theme.id;
-		option.textContent = theme.name;
-		option.dataset.customTheme = "true";
-		select.append(option);
-	}
-	select.value = settings.theme;
-}
-
 function applyUserSettings(settings) {
 	const root = document.documentElement;
 	root.dataset.theme = settings.theme;
@@ -410,49 +286,12 @@ function applyUserSettings(settings) {
 	} else {
 		root.style.removeProperty("--home-background-image");
 	}
-	for (const property of CUSTOM_THEME_PROPERTIES) {
-		root.style.removeProperty(property);
-	}
-	const theme = settings.customThemes.find(
-		(item) => item.id === settings.theme
-	);
-	if (theme) {
-		const { background, surface, accent, text } = theme.colors;
-		const customProperties = {
-			"--background": background,
-			"--home": background,
-			"--chrome": surface,
-			"--chrome-raised": surface,
-			"--tab-inactive": surface,
-			"--field": surface,
-			"--menu": surface,
-			"--text": text,
-			"--muted": `color-mix(in srgb, ${text} 64%, transparent)`,
-			"--home-muted": `color-mix(in srgb, ${text} 64%, transparent)`,
-			"--home-title": text,
-			"--field-text": text,
-			"--menu-text": text,
-			"--hover": `color-mix(in srgb, ${surface} 84%, ${text})`,
-			"--menu-active": `color-mix(in srgb, ${surface} 84%, ${text})`,
-			"--accent": accent,
-			"--accent-warm": accent,
-			"--home-icon": surface,
-			"--home-card": `color-mix(in srgb, ${surface} 82%, white)`,
-			"--line": `color-mix(in srgb, ${text} 16%, transparent)`,
-			"--home-card-border": `color-mix(in srgb, ${text} 16%, transparent)`,
-			"--home-grid": `color-mix(in srgb, ${text} 6%, transparent)`,
-			"--surface-shadow": `color-mix(in srgb, ${text} 14%, transparent)`,
-		};
-		for (const [property, value] of Object.entries(customProperties)) {
-			root.style.setProperty(property, value);
-		}
-	}
 	for (const tab of tabs) {
 		tab.cloak =
 			settings.defaultCloak === "normal" ? null : settings.defaultCloak;
 	}
 	if (tabs.length) syncBrowser();
-	renderThemeOptions(settings);
+	document.getElementById("theme-select").value = settings.theme;
 	document.getElementById("background-select").value = settings.background;
 	document.getElementById("default-cloak-select").value = settings.defaultCloak;
 	const preview = document.getElementById("background-image-preview");
@@ -460,9 +299,6 @@ function applyUserSettings(settings) {
 	preview.src = settings.backgroundImage || "";
 	document.getElementById("remove-background-image").hidden =
 		!settings.backgroundImage;
-	const customControls = document.getElementById("custom-theme-controls");
-	customControls.hidden = !theme;
-	document.getElementById("delete-custom-theme").hidden = !theme;
 }
 
 function saveUserSettings() {
@@ -481,54 +317,24 @@ function saveUserSettings() {
 }
 
 function readSettingsForm() {
-	const settings = {
+	return {
 		...settingsDraft,
-		customThemes: settingsDraft.customThemes.map((theme) => ({
-			...theme,
-			colors: { ...theme.colors },
-		})),
 		theme: document.getElementById("theme-select").value,
 		background: document.getElementById("background-select").value,
 		defaultCloak: document.getElementById("default-cloak-select").value,
 	};
-	const theme = settings.customThemes.find(
-		(item) => item.id === settings.theme
-	);
-	if (theme) {
-		theme.name =
-			document.getElementById("custom-theme-name").value.trim() ||
-			"Custom theme";
-		theme.colors = {
-			background: document.getElementById("custom-background-color").value,
-			surface: document.getElementById("custom-surface-color").value,
-			accent: document.getElementById("custom-accent-color").value,
-			text: document.getElementById("custom-text-color").value,
-		};
-	}
-	return settings;
 }
 
 function syncSettingsForm(settings) {
-	renderThemeOptions(settings);
+	document.getElementById("theme-select").value = settings.theme;
 	document.getElementById("background-select").value = settings.background;
 	document.getElementById("default-cloak-select").value = settings.defaultCloak;
-	const theme = settings.customThemes.find(
-		(item) => item.id === settings.theme
-	);
-	const colors = theme?.colors || DEFAULT_USER_SETTINGS.defaultCustomTheme;
-	document.getElementById("custom-theme-name").value = theme?.name || "";
-	document.getElementById("custom-background-color").value = colors.background;
-	document.getElementById("custom-surface-color").value = colors.surface;
-	document.getElementById("custom-accent-color").value = colors.accent;
-	document.getElementById("custom-text-color").value = colors.text;
 	const preview = document.getElementById("background-image-preview");
 	preview.hidden = !settings.backgroundImage;
 	preview.src = settings.backgroundImage || "";
 	document.getElementById("remove-background-image").hidden =
 		!settings.backgroundImage;
 	document.getElementById("background-image-file").value = "";
-	document.getElementById("custom-theme-controls").hidden = !theme;
-	document.getElementById("delete-custom-theme").hidden = !theme;
 }
 
 function openUserSettings() {
@@ -540,34 +346,6 @@ function openUserSettings() {
 
 function previewUserSettings() {
 	settingsDraft = readSettingsForm();
-	applyUserSettings(settingsDraft);
-}
-
-function createCustomTheme() {
-	settingsDraft = readSettingsForm();
-	if (settingsDraft.customThemes.length >= 20) {
-		document.getElementById("user-settings-message").textContent =
-			"You can save up to 20 custom themes.";
-		return;
-	}
-	const id = `custom-${crypto.randomUUID()}`;
-	settingsDraft.customThemes.push({
-		id,
-		name: "My theme",
-		colors: { ...DEFAULT_USER_SETTINGS.defaultCustomTheme },
-	});
-	settingsDraft.theme = id;
-	syncSettingsForm(settingsDraft);
-	applyUserSettings(settingsDraft);
-}
-
-function deleteCustomTheme() {
-	settingsDraft = readSettingsForm();
-	settingsDraft.customThemes = settingsDraft.customThemes.filter(
-		(theme) => theme.id !== settingsDraft.theme
-	);
-	settingsDraft.theme = "moss";
-	syncSettingsForm(settingsDraft);
 	applyUserSettings(settingsDraft);
 }
 
@@ -923,43 +701,14 @@ document
 				"Settings saved on this device.";
 		}
 	});
-document.getElementById("theme-select").addEventListener("change", () => {
-	const currentTheme = settingsDraft.customThemes.find(
-		(theme) => theme.id === settingsDraft.theme
-	);
-	if (currentTheme) {
-		currentTheme.name =
-			document.getElementById("custom-theme-name").value.trim() ||
-			"Custom theme";
-		currentTheme.colors = {
-			background: document.getElementById("custom-background-color").value,
-			surface: document.getElementById("custom-surface-color").value,
-			accent: document.getElementById("custom-accent-color").value,
-			text: document.getElementById("custom-text-color").value,
-		};
-	}
-	settingsDraft.theme = document.getElementById("theme-select").value;
-	syncSettingsForm(settingsDraft);
-	applyUserSettings(settingsDraft);
-});
 for (const id of [
+	"theme-select",
 	"background-select",
 	"default-cloak-select",
-	"custom-theme-name",
-	"custom-background-color",
-	"custom-surface-color",
-	"custom-accent-color",
-	"custom-text-color",
 ]) {
 	document.getElementById(id).addEventListener("input", previewUserSettings);
 	document.getElementById(id).addEventListener("change", previewUserSettings);
 }
-document
-	.getElementById("create-custom-theme")
-	.addEventListener("click", createCustomTheme);
-document
-	.getElementById("delete-custom-theme")
-	.addEventListener("click", deleteCustomTheme);
 document
 	.getElementById("background-image-file")
 	.addEventListener("change", async (event) => {
@@ -989,10 +738,7 @@ document
 		applyUserSettings(settingsDraft);
 	});
 document.getElementById("user-settings-reset").addEventListener("click", () => {
-	userSettings = {
-		...DEFAULT_USER_SETTINGS,
-		customThemes: [],
-	};
+	userSettings = { ...DEFAULT_USER_SETTINGS };
 	settingsDraft = null;
 	syncSettingsForm(userSettings);
 	applyUserSettings(userSettings);
