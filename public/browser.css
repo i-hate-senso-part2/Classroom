@@ -202,7 +202,7 @@ select:focus-visible {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 0.82rem;
+	font-size: 0.9rem;
 }
 
 .tab-close {
@@ -338,7 +338,7 @@ select:focus-visible {
 	outline: 0;
 	background: transparent;
 	color: var(--field-text);
-	font-size: 0.9rem;
+	font-size: 0.98rem;
 }
 
 #sj-address::placeholder {
@@ -402,7 +402,7 @@ select:focus-visible {
 	background: transparent;
 	color: var(--menu-text);
 	text-align: left;
-	font-size: 0.84rem;
+	font-size: 0.9rem;
 	cursor: pointer;
 }
 .engine-option:hover,
@@ -506,11 +506,11 @@ select:focus-visible {
 }
 
 .home-content {
-	width: min(1040px, 100%);
+	width: min(1120px, 100%);
 	display: grid;
 	grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
 	align-items: center;
-	gap: clamp(42px, 7vw, 92px);
+	gap: clamp(48px, 6vw, 80px);
 	margin: auto;
 }
 .home-lead {
@@ -535,7 +535,7 @@ select:focus-visible {
 .home-kicker {
 	display: block;
 	color: var(--accent);
-	font-size: 0.72rem;
+	font-size: 0.76rem;
 	font-weight: 700;
 	letter-spacing: 0.13em;
 }
@@ -543,24 +543,24 @@ select:focus-visible {
 	display: block;
 	margin-top: 3px;
 	color: var(--home-muted);
-	font-size: 0.8rem;
+	font-size: 0.9rem;
 }
 .home-lead h1 {
 	margin: 0;
 	color: var(--home-title);
 	font-family: "Manrope", "Inter", "Segoe UI", sans-serif;
-	font-size: clamp(2.6rem, 5vw, 3.7rem);
-	line-height: 1.04;
-	font-weight: 650;
-	letter-spacing: -0.055em;
+	font-size: clamp(3rem, 5vw, 4rem);
+	line-height: 1.08;
+	font-weight: 700;
+	letter-spacing: -0.02em;
 }
 .home-intro {
-	margin: 13px 0 24px;
+	margin: 15px 0 27px;
 	color: var(--home-muted);
-	font-size: 0.96rem;
+	font-size: 1.05rem;
 }
 .home-search {
-	height: 58px;
+	height: 62px;
 	display: flex;
 	align-items: center;
 	gap: 14px;
@@ -594,15 +594,15 @@ select:focus-visible {
 	outline: 0;
 	background: transparent;
 	color: var(--field-text);
-	font-size: 0.98rem;
+	font-size: 1.04rem;
 }
 .home-search input::placeholder {
 	color: var(--muted);
 }
 .home-search button {
-	width: 40px;
-	height: 40px;
-	flex: 0 0 40px;
+	width: 44px;
+	height: 44px;
+	flex: 0 0 44px;
 	display: grid;
 	place-items: center;
 	border: 0;
@@ -638,27 +638,27 @@ select:focus-visible {
 	margin: 0;
 	color: var(--home-title);
 	font-family: "Manrope", "Inter", "Segoe UI", sans-serif;
-	font-size: 1rem;
+	font-size: 1.12rem;
 	font-weight: 600;
 }
 .home-section-heading span {
 	color: var(--home-muted);
-	font-size: 0.67rem;
+	font-size: 0.74rem;
 	font-weight: 700;
 	letter-spacing: 0.12em;
 }
 .quick-links {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 10px;
+	gap: 12px;
 }
 .quick-link {
 	min-width: 0;
-	min-height: 66px;
+	min-height: 76px;
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 11px 12px;
+	gap: 14px;
+	padding: 14px;
 	border: 1px solid var(--home-card-border);
 	border-radius: 9px;
 	background: var(--home-card);
@@ -680,9 +680,9 @@ select:focus-visible {
 	outline-offset: 2px;
 }
 .quick-link-mark {
-	width: 34px;
-	height: 34px;
-	flex: 0 0 34px;
+	width: 40px;
+	height: 40px;
+	flex: 0 0 40px;
 	display: grid;
 	place-items: center;
 	border-radius: 8px;
@@ -694,8 +694,8 @@ select:focus-visible {
 	background: color-mix(in srgb, var(--accent-warm) 35%, var(--home-icon));
 }
 .quick-link-mark img {
-	width: 25px;
-	height: 25px;
+	width: 28px;
+	height: 28px;
 	display: block;
 	object-fit: contain;
 }
@@ -704,22 +704,24 @@ select:focus-visible {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 0.86rem;
+	font-size: 0.96rem;
 	font-weight: 600;
 }
 
 .home-footer {
-	width: min(1040px, 100%);
-	margin-top: 28px;
-	border-top: 1px solid var(--home-card-border);
+	width: min(1120px, 100%);
+	margin-top: 36px;
+	padding-top: 2px;
+	border-top: 1px solid
+		color-mix(in srgb, var(--home-card-border), var(--home-muted) 24%);
 }
 .home-notice {
-	max-width: 760px;
-	margin: 11px auto 0;
+	max-width: 900px;
+	margin: 13px auto 0;
 	color: var(--home-muted);
 	text-align: center;
-	font-size: 0.68rem;
-	line-height: 1.5;
+	font-size: 0.8rem;
+	line-height: 1.65;
 }
 
 :root[data-home-background="image"] .home-screen {
@@ -1138,16 +1140,16 @@ html:fullscreen .browser-stage {
 		flex-basis: 46px;
 	}
 	.home-lead h1 {
-		font-size: 2.35rem;
+		font-size: 2.65rem;
 	}
 	.home-search {
-		height: 54px;
+		height: 58px;
 	}
 	.home-footer {
 		margin-top: 25px;
 	}
 	.home-notice {
-		font-size: 0.63rem;
+		font-size: 0.74rem;
 	}
 }
 
@@ -1160,12 +1162,12 @@ html:fullscreen .browser-stage {
 		display: none;
 	}
 	.quick-link {
-		min-height: 64px;
-		padding: 10px;
-		gap: 8px;
+		min-height: 72px;
+		padding: 12px;
+		gap: 10px;
 	}
 	.home-lead h1 {
-		font-size: 2.1rem;
+		font-size: 2.3rem;
 	}
 }
 
