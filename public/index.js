@@ -531,7 +531,8 @@ async function saveAdminAccessSettings() {
 			}),
 		});
 		if (!blocked) document.getElementById("blocked-until").value = "";
-		await refreshBlockedState();
+		const isBlocked = await closeAdminPanelIfBlocked();
+		if (isBlocked) return;
 		await refreshAdminPanel();
 		showAdminMessage(
 			blocked
@@ -681,6 +682,12 @@ async function refreshBlockedState() {
 	} catch {
 		return document.documentElement.hasAttribute("data-blocked-at-start");
 	}
+}
+
+async function closeAdminPanelIfBlocked() {
+	const blocked = await refreshBlockedState();
+	if (blocked && adminDialog.open) adminDialog.close();
+	return blocked;
 }
 
 function showAdminMessage(message, isError = false) {
@@ -1117,7 +1124,7 @@ document
 				method: "POST",
 				body: JSON.stringify({ adminBypass: event.target.checked }),
 			});
-			await refreshBlockedState();
+			if (await closeAdminPanelIfBlocked()) return;
 			showAdminMessage("Administrator bypass updated.");
 		} catch (err) {
 			event.target.checked = !event.target.checked;
