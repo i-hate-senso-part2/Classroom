@@ -48,7 +48,9 @@ const loginAttempts = new Map();
 const adminSessionLifetime = 8 * 60 * 60 * 1000;
 const defaultBrowserState = {
 	blocked: false,
+	blockedUntil: null,
 	adminBypass: false,
+	sharedLinks: [],
 	announcement: "",
 	announcementId: "",
 	announcementDismissible: true,
@@ -155,6 +157,13 @@ function normalizeBrowserState(state) {
 		throw new Error("Stored blocked setting is invalid.");
 	}
 	if (
+		state.blockedUntil !== undefined &&
+		state.blockedUntil !== null &&
+		(!Number.isSafeInteger(state.blockedUntil) || state.blockedUntil <= 0)
+	) {
+		throw new Error("Stored block expiry is invalid.");
+	}
+	if (
 		state.adminBypass !== undefined &&
 		typeof state.adminBypass !== "boolean"
 	) {
@@ -193,6 +202,36 @@ function normalizeBrowserState(state) {
 	) {
 		throw new Error("Stored announcement auto-close setting is invalid.");
 	}
+	if (state.sharedLinks !== undefined) {
+		if (!Array.isArray(state.sharedLinks) || state.sharedLinks.length > 8) {
+			throw new Error("Stored shared quick links are invalid.");
+		}
+		for (const link of state.sharedLinks) {
+			if (
+				!link ||
+				typeof link.label !== "string" ||
+				link.label.trim().length < 1 ||
+				link.label.trim().length > 32 ||
+				typeof link.url !== "string" ||
+				link.url.length > 2048
+			) {
+				throw new Error("Stored shared quick link is invalid.");
+			}
+			let url;
+			try {
+				url = new URL(link.url);
+			} catch {
+				throw new Error("Stored shared quick link URL is invalid.");
+			}
+			if (
+				!["http:", "https:"].includes(url.protocol) ||
+				url.username ||
+				url.password
+			) {
+				throw new Error("Shared quick links must use safe HTTP(S) URLs.");
+			}
+		}
+	}
 	return {
 		...defaultBrowserState,
 		...state,
@@ -223,6 +262,24 @@ async function readBrowserState() {
 	return { ...defaultBrowserState, blocked: legacyBlocked === "1" };
 }
 
+async function readCurrentBrowserState() {
+	const state = await readBrowserState();
+	if (
+		state.blocked &&
+		state.blockedUntil !== null &&
+		state.blockedUntil <= Date.now()
+	) {
+		const updated = normalizeBrowserState({
+			...state,
+			blocked: false,
+			blockedUntil: null,
+		});
+		await saveBrowserState(updated);
+		return updated;
+	}
+	return state;
+}
+
 function persistBrowserState(state) {
 	mkdirSync(dirname(browserStatePath), { recursive: true });
 	writeFileSync(browserStatePath, `${JSON.stringify(state, null, 2)}\n`, {
@@ -241,7 +298,7 @@ async function saveBrowserState(state) {
 }
 
 async function updateBrowserState(updates) {
-	const state = await readBrowserState();
+	const state = await readCurrentBrowserState();
 	const updated = normalizeBrowserState({ ...state, ...updates });
 	await saveBrowserState(updated);
 	return updated;
@@ -283,7 +340,7 @@ export const fastify = Fastify({
 
 fastify.get("/api/browser-state", async (request, reply) => {
 	try {
-		const state = await readBrowserState();
+		const state = await readCurrentBrowserState();
 		const isAdmin = getAdminSession(request);
 		const announcementExpired =
 			state.announcementExpiresAt !== null &&
@@ -291,7 +348,9 @@ fastify.get("/api/browser-state", async (request, reply) => {
 		const announcement = announcementExpired ? "" : state.announcement;
 		return reply.header("Cache-Control", "no-store").send({
 			blocked: state.blocked && !(state.adminBypass && isAdmin),
+			blockedUntil: state.blockedUntil,
 			isAdmin,
+			sharedLinks: state.sharedLinks,
 			announcement,
 			announcementId: announcement
 				? state.announcementId || state.announcement
@@ -348,10 +407,12 @@ fastify.get("/api/admin/state", async (request, reply) => {
 	if (!getAdminSession(request))
 		return reply.code(401).send({ error: "Admin sign-in required." });
 	try {
-		const state = await readBrowserState();
+		const state = await readCurrentBrowserState();
 		return reply.header("Cache-Control", "no-store").send({
 			blocked: state.blocked,
+			blockedUntil: state.blockedUntil,
 			adminBypass: state.adminBypass,
+			sharedLinks: state.sharedLinks,
 			announcement: state.announcement,
 			announcementDismissible: state.announcementDismissible,
 			announcementExpiresAt: state.announcementExpiresAt,
@@ -376,11 +437,76 @@ fastify.post("/api/admin/blocked", async (request, reply) => {
 	if (typeof request.body?.blocked !== "boolean") {
 		return reply.code(400).send({ error: "Blocked must be true or false." });
 	}
+	const blockedUntil = request.body.blockedUntil;
+	if (
+		request.body.blocked &&
+		blockedUntil !== undefined &&
+		blockedUntil !== null &&
+		(typeof blockedUntil !== "string" ||
+			!Number.isFinite(Date.parse(blockedUntil)) ||
+			Date.parse(blockedUntil) <= Date.now())
+	) {
+		return reply.code(400).send({
+			error: "Block end time must be in the future or empty.",
+		});
+	}
 	try {
 		const state = await updateBrowserState({
 			blocked: request.body.blocked,
+			blockedUntil:
+				request.body.blocked && blockedUntil ? Date.parse(blockedUntil) : null,
 		});
-		return reply.send({ blocked: state.blocked });
+		return reply.send({
+			blocked: state.blocked,
+			blockedUntil: state.blockedUntil,
+		});
+	} catch (error) {
+		request.log.error(error);
+		return reply.code(503).send({ error: error.message });
+	}
+});
+
+fastify.post("/api/admin/links", async (request, reply) => {
+	if (!getAdminSession(request))
+		return reply.code(401).send({ error: "Admin sign-in required." });
+	const links = request.body?.links;
+	if (!Array.isArray(links) || links.length > 8) {
+		return reply.code(400).send({ error: "Add between 0 and 8 shared links." });
+	}
+	const normalizedLinks = [];
+	for (const link of links) {
+		if (
+			!link ||
+			typeof link.label !== "string" ||
+			link.label.trim().length < 1 ||
+			link.label.trim().length > 32 ||
+			typeof link.url !== "string" ||
+			link.url.length > 2048
+		) {
+			return reply.code(400).send({
+				error: "Each link needs a label (1–32 characters) and a valid URL.",
+			});
+		}
+		let url;
+		try {
+			url = new URL(link.url);
+		} catch {
+			return reply.code(400).send({ error: "Enter a valid link URL." });
+		}
+		if (
+			!["http:", "https:"].includes(url.protocol) ||
+			url.username ||
+			url.password
+		) {
+			return reply
+				.code(400)
+				.send({ error: "Shared links must use HTTP or HTTPS URLs." });
+		}
+		normalizedLinks.push({ label: link.label.trim(), url: url.href });
+	}
+	try {
+		const state = await updateBrowserState({ sharedLinks: normalizedLinks });
+		return reply.send({ sharedLinks: state.sharedLinks });
 	} catch (error) {
 		request.log.error(error);
 		return reply.code(503).send({ error: error.message });

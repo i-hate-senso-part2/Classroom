@@ -34,6 +34,7 @@ const startupScreen = document.getElementById("startup-screen");
 const adminDialog = document.getElementById("admin-dialog");
 const announcementDialog = document.getElementById("announcement-dialog");
 const announcementMessage = document.getElementById("announcement-message");
+const announcementKicker = document.getElementById("announcement-kicker");
 const announcementDismissButton = document.getElementById(
 	"announcement-dismiss"
 );
@@ -46,6 +47,7 @@ let lastRefreshToken = null;
 let currentAnnouncementId = "";
 let announcementDismissible = true;
 let announcementAutoDismissTimer = null;
+let announcementPreviewing = false;
 let seenAnnouncementId = (() => {
 	try {
 		return localStorage.getItem("classroom-seen-announcement") || "";
@@ -105,6 +107,8 @@ let controller;
 let controllerReady;
 let settingsDraft = null;
 let bookmarks = [];
+let sharedLinks = [];
+let renderedSharedLinks = "";
 let arrowSequenceIndex = 0;
 const arrowSequence = ["ArrowUp", "ArrowDown", "ArrowUp", "ArrowDown"];
 
@@ -338,7 +342,9 @@ function saveUserSettings() {
 function readSettingsForm() {
 	return {
 		...settingsDraft,
-		theme: document.getElementById("theme-select").value,
+		theme:
+			document.querySelector('input[name="theme-option"]:checked')?.value ||
+			document.getElementById("theme-select").value,
 		background: document.getElementById("background-select").value,
 		defaultCloak: document.getElementById("default-cloak-select").value,
 	};
@@ -346,6 +352,11 @@ function readSettingsForm() {
 
 function syncSettingsForm(settings) {
 	document.getElementById("theme-select").value = settings.theme;
+	for (const option of document.querySelectorAll(
+		'input[name="theme-option"]'
+	)) {
+		option.checked = option.value === settings.theme;
+	}
 	document.getElementById("background-select").value = settings.background;
 	document.getElementById("default-cloak-select").value = settings.defaultCloak;
 	const preview = document.getElementById("background-image-preview");
@@ -354,6 +365,8 @@ function syncSettingsForm(settings) {
 	document.getElementById("remove-background-image").hidden =
 		!settings.backgroundImage;
 	document.getElementById("background-image-file").value = "";
+	document.getElementById("background-image-name").textContent =
+		settings.backgroundImage ? "Saved background image" : "No image selected";
 }
 
 function openUserSettings() {
@@ -430,30 +443,106 @@ async function refreshAdminPanel() {
 		form.hidden = true;
 		settings.hidden = false;
 		document.getElementById("blocked-toggle").checked = result.blocked;
+		document.getElementById("blocked-until").value = formatLocalDateTime(
+			result.blockedUntil
+		);
 		document.getElementById("admin-bypass-toggle").checked = result.adminBypass;
+		const links = Array.isArray(result.sharedLinks) ? result.sharedLinks : [];
+		document.getElementById("admin-shared-links").value = links
+			.map((link) => `${link.label} | ${link.url}`)
+			.join("\n");
 		document.getElementById("admin-announcement").value =
 			result.announcement || "";
 		document.getElementById("announcement-dismissible").checked =
 			result.announcementDismissible !== false;
 		document.getElementById("announcement-expires-at").value =
-			typeof result.announcementExpiresAt === "number"
-				? new Date(
-						result.announcementExpiresAt -
-							new Date(result.announcementExpiresAt).getTimezoneOffset() * 60000
-					)
-						.toISOString()
-						.slice(0, 16)
-				: "";
+			formatLocalDateTime(result.announcementExpiresAt);
 		document.getElementById("announcement-auto-dismiss").value = String(
 			result.announcementAutoDismissSeconds || 0
 		);
+		updateAdminStatus(result, links);
 		message.textContent = "Administrator access verified.";
 	} catch (err) {
 		form.hidden = false;
 		settings.hidden = true;
+		document.getElementById("admin-status-store").textContent = "Unavailable";
+		document.getElementById("admin-status-store").dataset.state = "blocked";
 		message.textContent = err.message.includes("ADMIN_PASSWORD_HASH")
 			? "Admin is disabled until a valid ADMIN_PASSWORD_HASH is set on the server."
 			: "Sign in to manage browser settings.";
+	}
+}
+
+function updateAdminStatus(state, links) {
+	const access = document.getElementById("admin-status-access");
+	access.textContent = state.blocked ? "Blocked" : "Open";
+	access.dataset.state = state.blocked ? "blocked" : "active";
+	if (state.blocked && state.blockedUntil) {
+		access.title = `Until ${new Date(state.blockedUntil).toLocaleString()}`;
+	} else {
+		access.removeAttribute("title");
+	}
+	const announcement = document.getElementById("admin-status-announcement");
+	const announcementActive =
+		Boolean(state.announcement) &&
+		(state.announcementExpiresAt === null ||
+			state.announcementExpiresAt > Date.now());
+	announcement.textContent = announcementActive ? "Live" : "None";
+	announcement.dataset.state = announcementActive ? "active" : "";
+	const linkStatus = document.getElementById("admin-status-links");
+	linkStatus.textContent = `${links.length} / 8`;
+	linkStatus.dataset.state = links.length ? "active" : "";
+	const store = document.getElementById("admin-status-store");
+	store.textContent = "Online";
+	store.dataset.state = "active";
+}
+
+async function refreshAdminStatus() {
+	try {
+		const state = await adminRequest("/api/admin/state");
+		updateAdminStatus(
+			state,
+			Array.isArray(state.sharedLinks) ? state.sharedLinks : []
+		);
+	} catch {
+		const store = document.getElementById("admin-status-store");
+		store.textContent = "Unavailable";
+		store.dataset.state = "blocked";
+	}
+}
+
+function formatLocalDateTime(timestamp) {
+	if (typeof timestamp !== "number") return "";
+	return new Date(timestamp - new Date(timestamp).getTimezoneOffset() * 60000)
+		.toISOString()
+		.slice(0, 16);
+}
+
+async function saveAdminAccessSettings() {
+	const blocked = document.getElementById("blocked-toggle").checked;
+	const blockedUntil = document.getElementById("blocked-until").value;
+	try {
+		await adminRequest("/api/admin/blocked", {
+			method: "POST",
+			body: JSON.stringify({
+				blocked,
+				blockedUntil:
+					blocked && blockedUntil ? new Date(blockedUntil).toISOString() : null,
+			}),
+		});
+		if (!blocked) document.getElementById("blocked-until").value = "";
+		await refreshBlockedState();
+		await refreshAdminPanel();
+		showAdminMessage(
+			blocked
+				? blockedUntil
+					? "Access block and end time saved."
+					: "Access blocked until you turn it off."
+				: "Visitor access is open."
+		);
+	} catch (err) {
+		await refreshAdminPanel();
+		showAdminMessage(err.message, true);
 	}
 }
 
@@ -461,6 +550,14 @@ function closeAnnouncement() {
 	window.clearTimeout(announcementAutoDismissTimer);
 	announcementAutoDismissTimer = null;
 	if (announcementDialog.open) announcementDialog.close();
+}
+
+function closeAnnouncementPreview() {
+	announcementPreviewing = false;
+	announcementDismissible = true;
+	announcementKicker.textContent = "ANNOUNCEMENT";
+	closeAnnouncement();
+	void refreshBlockedState();
 }
 
 function markAnnouncementSeen(id) {
@@ -478,6 +575,7 @@ function dismissAnnouncement() {
 }
 
 function syncAnnouncement(state, blocked) {
+	if (announcementPreviewing) return;
 	const message =
 		typeof state.announcement === "string" ? state.announcement.trim() : "";
 	const id =
@@ -548,6 +646,15 @@ async function refreshBlockedState() {
 		if (typeof blocked !== "boolean") {
 			return document.documentElement.hasAttribute("data-blocked-at-start");
 		}
+		const incomingSharedLinks = Array.isArray(state.sharedLinks)
+			? state.sharedLinks
+			: [];
+		const sharedLinksState = JSON.stringify(incomingSharedLinks);
+		if (sharedLinksState !== renderedSharedLinks) {
+			sharedLinks = incomingSharedLinks;
+			renderedSharedLinks = sharedLinksState;
+			renderQuickLinks();
+		}
 		blockedOverlay.hidden = !blocked;
 		document.documentElement.toggleAttribute("data-blocked-at-start", blocked);
 		syncAnnouncement(state, blocked);
@@ -584,9 +691,14 @@ function renderQuickLinks() {
 	quickLinks.replaceChildren();
 	const links = [
 		...defaultLinks,
+		...sharedLinks.filter((link) => link && link.url && link.label),
 		...bookmarks.filter((bookmark) => bookmark && bookmark.url),
 	];
-	for (const link of links) {
+	const uniqueLinks = links.filter(
+		(link, index, list) =>
+			list.findIndex((candidate) => candidate.url === link.url) === index
+	);
+	for (const link of uniqueLinks) {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.className = "quick-link";
@@ -595,10 +707,16 @@ function renderQuickLinks() {
 		const mark = document.createElement("span");
 		mark.className = "quick-link-mark";
 		mark.setAttribute("aria-hidden", "true");
-		const image = document.createElement("img");
-		image.src = link.logo || "/sj.png";
-		image.alt = "";
-		mark.append(image);
+		if (link.logo) {
+			const image = document.createElement("img");
+			image.src = link.logo;
+			image.alt = "";
+			mark.append(image);
+		} else {
+			mark.textContent = (link.label || new URL(link.url).hostname)
+				.slice(0, 1)
+				.toUpperCase();
+		}
 		const label = document.createElement("span");
 		label.className = "quick-link-label";
 		label.textContent = link.label || new URL(link.url).hostname;
@@ -843,24 +961,28 @@ document
 				"Settings saved on this device.";
 		}
 	});
-for (const id of [
-	"theme-select",
-	"background-select",
-	"default-cloak-select",
-]) {
+for (const id of ["background-select", "default-cloak-select"]) {
 	document.getElementById(id).addEventListener("input", previewUserSettings);
 	document.getElementById(id).addEventListener("change", previewUserSettings);
 }
+document.querySelectorAll('input[name="theme-option"]').forEach((option) => {
+	option.addEventListener("change", () => {
+		document.getElementById("theme-select").value = option.value;
+		previewUserSettings();
+	});
+});
 document
 	.getElementById("background-image-file")
 	.addEventListener("change", async (event) => {
 		const file = event.target.files?.[0];
 		if (!file) return;
+		document.getElementById("background-image-name").textContent = file.name;
 		try {
 			settingsDraft = readSettingsForm();
 			settingsDraft.backgroundImage = await encodeBackgroundImage(file);
 			settingsDraft.background = "image";
 			syncSettingsForm(settingsDraft);
+			document.getElementById("background-image-name").textContent = file.name;
 			applyUserSettings(settingsDraft);
 			document.getElementById("user-settings-message").textContent =
 				"Background preview ready. Save settings to keep it.";
@@ -868,6 +990,10 @@ document
 			document.getElementById("user-settings-message").textContent =
 				error.message;
 			event.target.value = "";
+			document.getElementById("background-image-name").textContent =
+				userSettings.backgroundImage
+					? "Saved background image"
+					: "No image selected";
 		}
 	});
 document
@@ -919,10 +1045,30 @@ async function toggleFullscreen() {
 fullscreenToggle.addEventListener("click", toggleFullscreen);
 fullscreenExit.addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", updateFullscreenState);
-announcementDismissButton.addEventListener("click", dismissAnnouncement);
+announcementDismissButton.addEventListener("click", () => {
+	if (announcementPreviewing) closeAnnouncementPreview();
+	else dismissAnnouncement();
+});
+document
+	.getElementById("preview-announcement")
+	.addEventListener("click", () => {
+		const message = document.getElementById("admin-announcement").value.trim();
+		if (!message) {
+			showAdminMessage("Write a message before previewing it.", true);
+			return;
+		}
+		window.clearTimeout(announcementAutoDismissTimer);
+		announcementPreviewing = true;
+		announcementDismissible = true;
+		announcementKicker.textContent = "PREVIEW";
+		announcementMessage.textContent = message;
+		announcementDismissButton.hidden = false;
+		if (!announcementDialog.open) announcementDialog.showModal();
+	});
 announcementDialog.addEventListener("cancel", (event) => {
 	event.preventDefault();
-	if (announcementDismissible) dismissAnnouncement();
+	if (announcementPreviewing) closeAnnouncementPreview();
+	else if (announcementDismissible) dismissAnnouncement();
 });
 window.addEventListener("storage", (event) => {
 	if (event.key !== "classroom-seen-announcement") return;
@@ -957,19 +1103,10 @@ document
 	});
 document
 	.getElementById("blocked-toggle")
-	.addEventListener("change", async (event) => {
-		try {
-			await adminRequest("/api/admin/blocked", {
-				method: "POST",
-				body: JSON.stringify({ blocked: event.target.checked }),
-			});
-			await refreshBlockedState();
-			showAdminMessage("Blocked setting updated.");
-		} catch (err) {
-			event.target.checked = !event.target.checked;
-			showAdminMessage(err.message, true);
-		}
-	});
+	.addEventListener("change", saveAdminAccessSettings);
+document
+	.getElementById("save-block-schedule")
+	.addEventListener("click", saveAdminAccessSettings);
 document
 	.getElementById("admin-bypass-toggle")
 	.addEventListener("change", async (event) => {
@@ -1023,6 +1160,46 @@ document
 		document.getElementById("announcement-expires-at").value = "";
 		document.getElementById("announcement-auto-dismiss").value = "0";
 		document.getElementById("admin-announcement-form").requestSubmit();
+	});
+document
+	.getElementById("admin-links-form")
+	.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		const lines = document
+			.getElementById("admin-shared-links")
+			.value.split(/\r?\n/)
+			.map((line) => line.trim())
+			.filter(Boolean);
+		if (lines.length > 8) {
+			showAdminMessage("You can add up to 8 shared quick links.", true);
+			return;
+		}
+		const links = [];
+		for (const line of lines) {
+			const separator = line.indexOf("|");
+			if (separator < 1) {
+				showAdminMessage(
+					"Use one link per line in the format: Label | https://example.com",
+					true
+				);
+				return;
+			}
+			links.push({
+				label: line.slice(0, separator).trim(),
+				url: line.slice(separator + 1).trim(),
+			});
+		}
+		try {
+			await adminRequest("/api/admin/links", {
+				method: "POST",
+				body: JSON.stringify({ links }),
+			});
+			await refreshBlockedState();
+			await refreshAdminPanel();
+			showAdminMessage("Shared quick links saved.");
+		} catch (err) {
+			showAdminMessage(err.message, true);
+		}
 	});
 document.getElementById("refresh-all").addEventListener("click", async () => {
 	if (
@@ -1144,7 +1321,12 @@ async function finishStartup() {
 }
 
 finishStartup();
-window.setInterval(refreshBlockedState, 10000);
+window.setInterval(() => {
+	void refreshBlockedState();
+	if (adminDialog.open && !document.getElementById("admin-settings").hidden) {
+		void refreshAdminStatus();
+	}
+}, 10000);
 document.addEventListener("visibilitychange", () => {
 	if (!document.hidden) refreshBlockedState();
 });

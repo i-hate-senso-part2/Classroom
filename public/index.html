@@ -18,7 +18,7 @@
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
-			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap"
+			href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap"
 			rel="stylesheet"
 		/>
 		<link rel="stylesheet" href="browser.css" />
@@ -281,8 +281,8 @@
 		>
 			<div class="dialog-heading">
 				<div>
-					<span class="dialog-kicker">e</span>
-					<h2 id="admin-title">hi admin</h2>
+					<span class="dialog-kicker">CONTROL ROOM</span>
+					<h2 id="admin-title">Admin console</h2>
 				</div>
 				<button
 					id="admin-close"
@@ -307,72 +307,152 @@
 				<button class="dialog-primary" type="submit">Sign in</button>
 			</form>
 			<section id="admin-settings" hidden>
-				<label class="setting-row" for="blocked-toggle"
-					><span
-						><strong>Blocked</strong
-						><small>Show the restriction screen to visitors</small></span
-					><input id="blocked-toggle" type="checkbox"
-				/></label>
-				<label class="setting-row" for="admin-bypass-toggle"
-					><span
-						><strong>Admin bypass</strong
-						><small
-							>Let signed-in administrators through while blocked</small
-						></span
-					><input id="admin-bypass-toggle" type="checkbox"
-				/></label>
-				<label class="setting-row" for="announcement-dismissible"
-					><span
-						><strong>Visitors can close it</strong
-						><small>Show a close button on the announcement popup</small></span
-					><input id="announcement-dismissible" type="checkbox"
-				/></label>
-				<form id="admin-announcement-form">
-					<label for="admin-announcement">Popup announcement</label>
-					<textarea
-						id="admin-announcement"
-						rows="3"
-						maxlength="500"
-						placeholder="Write an update for everyone"
-					></textarea>
-					<label for="announcement-expires-at"
-						>Expire globally at (optional)</label
-					>
-					<input id="announcement-expires-at" type="datetime-local" />
-					<small class="admin-field-note"
-						>Uses your local time. Leave blank for no expiry.</small
-					>
-					<label for="announcement-auto-dismiss"
-						>Auto-close for each visitor</label
-					>
-					<select id="announcement-auto-dismiss">
-						<option value="0">Never</option>
-						<option value="5">After 5 seconds</option>
-						<option value="10">After 10 seconds</option>
-						<option value="15">After 15 seconds</option>
-						<option value="30">After 30 seconds</option>
-						<option value="60">After 1 minute</option>
-						<option value="120">After 2 minutes</option>
-					</select>
-					<div class="admin-actions">
+				<div class="admin-status-grid" aria-label="Live status">
+					<div class="admin-status-card">
+						<span>Access</span>
+						<strong id="admin-status-access">Checking</strong>
+					</div>
+					<div class="admin-status-card">
+						<span>Announcement</span>
+						<strong id="admin-status-announcement">Checking</strong>
+					</div>
+					<div class="admin-status-card">
+						<span>Shared links</span>
+						<strong id="admin-status-links">Checking</strong>
+					</div>
+					<div class="admin-status-card">
+						<span>State store</span>
+						<strong id="admin-status-store">Checking</strong>
+					</div>
+				</div>
+				<section class="admin-section" aria-labelledby="access-heading">
+					<div class="admin-section-heading">
+						<div>
+							<span class="admin-section-index">01</span>
+							<h3 id="access-heading">Access</h3>
+						</div>
+						<p>Control who can open the browser.</p>
+					</div>
+					<label class="setting-row" for="blocked-toggle">
+						<span>
+							<strong>Block visitors</strong>
+							<small>Show the restriction screen to everyone else</small>
+						</span>
+						<input id="blocked-toggle" type="checkbox" />
+					</label>
+					<div class="admin-field">
+						<label for="blocked-until">Automatically unblock at</label>
+						<input id="blocked-until" type="datetime-local" />
+						<small>Leave blank to keep blocking until you turn it off.</small>
 						<button
-							id="clear-announcement"
+							id="save-block-schedule"
 							class="dialog-secondary"
 							type="button"
 						>
-							Clear
-						</button>
-						<button class="dialog-primary" type="submit">
-							Post announcement
+							Save access settings
 						</button>
 					</div>
-				</form>
-				<button id="refresh-all" class="dialog-secondary" type="button">
-					Refresh everyone else
-				</button>
-				<button id="admin-logout" class="dialog-secondary" type="button">
-					Sign out
-				</button>
+					<label class="setting-row" for="admin-bypass-toggle">
+						<span>
+							<strong>Admin bypass</strong>
+							<small>Let signed-in administrators through while blocked</small>
+						</span>
+						<input id="admin-bypass-toggle" type="checkbox" />
+					</label>
+				</section>
+				<section class="admin-section" aria-labelledby="announcement-heading">
+					<div class="admin-section-heading">
+						<div>
+							<span class="admin-section-index">02</span>
+							<h3 id="announcement-heading">Announcement</h3>
+						</div>
+						<p>Write an update for visitors.</p>
+					</div>
+					<form id="admin-announcement-form">
+						<label for="admin-announcement">Message</label>
+						<textarea
+							id="admin-announcement"
+							rows="3"
+							maxlength="500"
+							placeholder="Write an update for everyone"
+						></textarea>
+						<label class="setting-row" for="announcement-dismissible">
+							<span>
+								<strong>Visitors can close it</strong>
+								<small>Show a close button on the announcement popup</small>
+							</span>
+							<input id="announcement-dismissible" type="checkbox" />
+						</label>
+						<div class="admin-field">
+							<label for="announcement-expires-at">Global expiry</label>
+							<input id="announcement-expires-at" type="datetime-local" />
+							<small>Optional. Uses your local time.</small>
+						</div>
+						<div class="admin-field">
+							<label for="announcement-auto-dismiss"
+								>Auto-close per visitor</label
+							>
+							<select id="announcement-auto-dismiss">
+								<option value="0">Never</option>
+								<option value="5">After 5 seconds</option>
+								<option value="10">After 10 seconds</option>
+								<option value="15">After 15 seconds</option>
+								<option value="30">After 30 seconds</option>
+								<option value="60">After 1 minute</option>
+								<option value="120">After 2 minutes</option>
+							</select>
+						</div>
+						<div class="admin-actions">
+							<button
+								id="preview-announcement"
+								class="dialog-secondary"
+								type="button"
+							>
+								Preview
+							</button>
+							<button
+								id="clear-announcement"
+								class="dialog-secondary"
+								type="button"
+							>
+								Clear
+							</button>
+							<button class="dialog-primary" type="submit">Post update</button>
+						</div>
+					</form>
+				</section>
+				<section class="admin-section" aria-labelledby="links-heading">
+					<div class="admin-section-heading">
+						<div>
+							<span class="admin-section-index">03</span>
+							<h3 id="links-heading">Shared quick links</h3>
+						</div>
+						<p>Homepage links for everyone, up to 8.</p>
+					</div>
+					<form id="admin-links-form">
+						<label for="admin-shared-links">One per line: label | URL</label>
+						<textarea
+							id="admin-shared-links"
+							rows="4"
+							placeholder="School portal | https://school.example"
+							spellcheck="false"
+						></textarea>
+						<div class="admin-actions">
+							<button class="dialog-primary" type="submit">Save links</button>
+						</div>
+					</form>
+				</section>
+				<section
+					class="admin-section admin-section-actions"
+					aria-label="Actions"
+				>
+					<button id="refresh-all" class="dialog-secondary" type="button">
+						Refresh everyone else
+					</button>
+					<button id="admin-logout" class="dialog-secondary" type="button">
+						Sign out
+					</button>
+				</section>
 			</section>
 			<p id="admin-message" class="dialog-message" aria-live="polite"></p>
 		</dialog>
@@ -383,7 +463,9 @@
 		>
 			<div class="dialog-heading">
 				<div>
-					<span class="dialog-kicker">ANNOUNCEMENT</span>
+					<span id="announcement-kicker" class="dialog-kicker"
+						>ANNOUNCEMENT</span
+					>
 					<h2 id="announcement-title">A note for you</h2>
 				</div>
 				<button
@@ -423,15 +505,49 @@
 				</button>
 			</div>
 			<form id="user-settings-form">
-				<label for="theme-select">Theme</label>
-				<div class="theme-select-row">
-					<select id="theme-select" aria-label="Theme">
-						<option value="moss">Fern</option>
-						<option value="midnight">Slate</option>
-						<option value="sunset">Ember</option>
-						<option value="ocean">Tide</option>
-					</select>
-				</div>
+				<select id="theme-select" hidden>
+					<option value="moss">Fern</option>
+					<option value="midnight">Slate</option>
+					<option value="sunset">Ember</option>
+					<option value="ocean">Tide</option>
+				</select>
+				<fieldset class="theme-picker">
+					<legend>Theme</legend>
+					<div class="theme-options">
+						<label class="theme-option">
+							<input type="radio" name="theme-option" value="moss" />
+							<span
+								class="theme-swatch theme-swatch-moss"
+								aria-hidden="true"
+							></span>
+							<span>Fern</span>
+						</label>
+						<label class="theme-option">
+							<input type="radio" name="theme-option" value="midnight" />
+							<span
+								class="theme-swatch theme-swatch-midnight"
+								aria-hidden="true"
+							></span>
+							<span>Slate</span>
+						</label>
+						<label class="theme-option">
+							<input type="radio" name="theme-option" value="sunset" />
+							<span
+								class="theme-swatch theme-swatch-sunset"
+								aria-hidden="true"
+							></span>
+							<span>Ember</span>
+						</label>
+						<label class="theme-option">
+							<input type="radio" name="theme-option" value="ocean" />
+							<span
+								class="theme-swatch theme-swatch-ocean"
+								aria-hidden="true"
+							></span>
+							<span>Tide</span>
+						</label>
+					</div>
+				</fieldset>
 				<label for="background-select">Home background</label>
 				<select id="background-select">
 					<option value="grid">Fine grid</option>
@@ -440,11 +556,20 @@
 					<option value="image">Custom image</option>
 				</select>
 				<label for="background-image-file">Background image</label>
-				<input
-					id="background-image-file"
-					type="file"
-					accept="image/png,image/jpeg,image/webp,image/gif"
-				/>
+				<div class="file-picker">
+					<input
+						id="background-image-file"
+						class="file-picker-input"
+						type="file"
+						accept="image/png,image/jpeg,image/webp,image/gif"
+					/>
+					<label class="file-picker-button" for="background-image-file"
+						>Choose image</label
+					>
+					<span id="background-image-name" class="file-picker-name"
+						>No image selected</span
+					>
+				</div>
 				<div class="background-image-preview-row">
 					<img id="background-image-preview" alt="" hidden />
 					<button

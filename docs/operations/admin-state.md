@@ -20,7 +20,11 @@ The panel opens through its toolbar control or the Up, Down, Up, Down sequence. 
 
 Configure either both `KV_REST_API_URL` and `KV_REST_API_TOKEN`, or both supported `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` aliases. Partial configuration fails closed with an API error.
 
-The admin panel can enable the public blocked screen, allow authenticated admins to bypass it, and post or clear a 500-character announcement popup. Admins can choose whether visitors can close it, set a per-visitor auto-close timer, and optionally set a global expiration time. Visitors see each announcement once until it is changed; authenticated admins do not see the popup, so a non-closeable announcement cannot lock them out of its controls. The blocked screen is cached per browser so a previously blocked visitor sees it immediately on refresh while the live setting is checked.
+The admin panel can enable the public blocked screen, allow authenticated admins to bypass it, and schedule an automatic unblock time. The server clears an expired block on the next state request.
+
+Admins can post or clear a 500-character announcement popup, choose whether visitors can close it, set a per-visitor auto-close timer, and optionally set a global expiration time. A preview is local to the admin session. Visitors see each announcement once until it is changed; authenticated admins do not see published popups.
+
+Up to eight shared homepage links can be managed as `Label | https://example.com` lines. Only HTTP(S) URLs without embedded credentials are accepted. Changes are shared across visitors.
 
 The admin panel's "Refresh everyone else" action sends a shared refresh signal. Open pages poll the setting every 10 seconds, check whether they are blocked, and reload only if access is allowed. The admin page that sent the signal is excluded.
 
