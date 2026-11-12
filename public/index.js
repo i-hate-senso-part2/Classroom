@@ -760,7 +760,7 @@ async function prepareTransport() {
 			api.config.injectPath = "/scramjet-controller/controller.inject.js";
 			api.config.scramjetPath = "/scramjet/scramjet.js";
 			api.config.wasmPath = "/scramjet/scramjet.wasm";
-			const wispUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/wisp/`;
+			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
 			const transport = new window.LibcurlTransport.LibcurlClient({
 				wisp: wispUrl,
 			});

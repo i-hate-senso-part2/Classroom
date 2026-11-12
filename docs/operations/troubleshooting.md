@@ -9,8 +9,7 @@
 ## Browser navigation fails
 
 - Service workers require HTTPS except on `localhost` and `127.0.0.1`.
-- Check the browser console and server logs for errors while Scramjet initializes or the `/wisp/` WebSocket connects.
-- Confirm requests reach the same host serving the page, since current browser code constructs a same-origin Wisp URL.
+- Check the browser console for WebSocket errors connecting to `wss://wisp-server-python-nh0a.onrender.com/`; confirm the Render service is running and accepting connections at `/`.
 - Some upstream sites can block or limit traffic based on hosting IP, network policy, or request volume; this is outside the browser UI's control.
 
 ## Admin access is unavailable

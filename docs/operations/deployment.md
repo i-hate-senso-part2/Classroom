@@ -9,7 +9,7 @@
 
 Function filesystems are ephemeral, so the local JSON state file is not a suitable Vercel backend. Redeploy after changing environment variables. Admin auth remains disabled if its hash is absent or invalid.
 
-The Wisp endpoint is a WebSocket transport, while this function handles HTTP requests. Proxy navigation therefore requires a WebSocket-capable Wisp service; deploy Wisp on a host that supports persistent WebSocket upgrades and configure the browser to use that endpoint. Do not assume the same-origin `/wisp/` route works through a Vercel function.
+The browser connects to the WebSocket-capable Render Wisp service at `wss://wisp-server-python-nh0a.onrender.com/`; it does not use a same-origin `/wisp/` fallback. Vercel still routes app pages, static assets, and HTTP APIs through the configured Node function. Its same-origin Wisp route is not the browser's transport.
 
 ## Docker
 
