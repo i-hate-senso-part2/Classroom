@@ -2,7 +2,7 @@
 
 ## Vercel
 
-Vercel serves `public/` as static output from its CDN; only `/api/*` requests run the Fastify handler through `api/[...path].js`. The build copies the Scramjet V2 runtime and Wasm from the installed package into `public/scramjet/`, so the static assets stay aligned with the dependency version. COOP and COEP headers are applied to static responses for cross-origin isolation.
+Vercel serves `public/` as static output from its CDN; `/api/*` requests are rewritten to the shared function at `api/index.js`, which runs the Fastify handler. The build copies the Scramjet V2 runtime and Wasm from the installed package into `public/scramjet/`, so the static assets stay aligned with the dependency version. COOP and COEP headers are applied to static responses for cross-origin isolation.
 
 The local server still serves static files through Fastify. `pnpm start` builds the V2 assets before starting it; the Docker image prepares them during its build. In the Vercel project settings, configure:
 
