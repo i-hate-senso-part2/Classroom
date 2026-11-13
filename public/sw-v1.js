@@ -47,6 +47,9 @@ const scramjet = new ScramjetServiceWorker();
 async function handleRequest(event) {
 	await databaseReady;
 	await scramjet.loadConfig();
+	if (!scramjet.config) {
+		throw new Error("Scramjet V1 configuration is missing in the service worker.");
+	}
 	if (scramjet.route(event)) {
 		return scramjet.fetch(event);
 	}
@@ -60,6 +63,21 @@ self.addEventListener("install", (event) => {
 self.addEventListener("message", (event) => {
 	if (event.data?.type === "CLASSROOM_SKIP_WAITING") {
 		event.waitUntil(self.skipWaiting());
+	} else if (event.data?.type === "CLASSROOM_V1_CONFIG_READY") {
+		event.waitUntil(
+			(async () => {
+				await databaseReady;
+				await scramjet.loadConfig();
+				if (!scramjet.config) {
+					throw new Error(
+						"Scramjet V1 configuration was not saved by the controller."
+					);
+				}
+				event.ports[0]?.postMessage({ ready: true });
+			})().catch((error) => {
+				event.ports[0]?.postMessage({ error: error.message });
+			})
+		);
 	}
 });
 

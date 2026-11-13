@@ -942,6 +942,56 @@ function toBareHeaders(headers) {
 	return result;
 }
 
+function waitForScramjetV1Config(serviceWorker) {
+	return new Promise((resolve, reject) => {
+		const channel = new MessageChannel();
+		let timeout;
+		const cleanup = () => {
+			window.clearTimeout(timeout);
+			channel.port1.close();
+			channel.port2.close();
+		};
+		channel.port1.onmessage = ({ data }) => {
+			cleanup();
+			if (data?.ready === true) {
+				resolve();
+			} else {
+				reject(
+					new Error(
+						data?.error ||
+							"Scramjet V1 service worker did not confirm its configuration."
+					)
+				);
+			}
+		};
+		channel.port1.onmessageerror = () => {
+			cleanup();
+			reject(
+				new Error(
+					"Scramjet V1 service worker returned an invalid configuration response."
+				)
+			);
+		};
+		timeout = window.setTimeout(() => {
+			cleanup();
+			reject(
+				new Error(
+					"Timed out waiting for the Scramjet V1 service worker configuration."
+				)
+			);
+		}, transportStageTimeout);
+		try {
+			serviceWorker.postMessage(
+				{ type: "CLASSROOM_V1_CONFIG_READY" },
+				[channel.port2]
+			);
+		} catch (error) {
+			cleanup();
+			reject(error);
+		}
+	});
+}
+
 function recordHistory(tab, url) {
 	if (!url || tab.history[tab.historyIndex] === url) return;
 	if (tab.history[tab.historyIndex - 1] === url) {
@@ -1100,6 +1150,11 @@ async function prepareTransport() {
 				await waitForTransportStage(
 					controller.init(),
 					"Scramjet v1 controller setup"
+				);
+				await waitForTransportStage(
+					waitForScramjetV1Config(serviceWorker),
+					"Scramjet v1 service worker configuration",
+					serviceWorkerTimeout * 2
 				);
 				return;
 			}
