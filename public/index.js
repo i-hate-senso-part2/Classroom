@@ -1025,6 +1025,7 @@ async function prepareTransport() {
 
 async function navigateTab(tab, url) {
 	showError("");
+	setLoading(true, tab);
 	try {
 		await prepareTransport();
 		tab.home = false;
