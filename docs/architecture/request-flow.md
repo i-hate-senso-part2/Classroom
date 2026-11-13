@@ -18,7 +18,7 @@ The browser also polls `/api/admin/browser-state` on load, when the tab becomes 
 - `/`: files from `public/`.
 - `/scramjet/`: Scramjet v2 runtime files from its installed package.
 - `/scram/`: Scramjet v1.1.0 runtime files from `public/scram/`. Vercel rewrites old `/scramjet-v1/` requests to this static directory. The V1 service worker only intercepts same-origin `/~1/` proxy URLs, leaving Classroom pages and assets untouched.
-- `/scram-v1/`: generated V1 controller bundle using a separate IndexedDB database at schema version 2.
+- `/scram-v1/`: generated V1 controller bundle using a separate IndexedDB database at schema version 3.
 - `/controller/`: Scramjet v2 controller API, service worker, and injection scripts from `public/controller/`.
 - `/libcurl/`, `/baremux/`, and `/epoxy/`: transport assets for the selected runtime.
 - `/wisp/`: WebSocket transport endpoint, not a static directory.

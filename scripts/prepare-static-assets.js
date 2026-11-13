@@ -17,7 +17,7 @@ const legacyOutputPath = fileURLToPath(
 );
 const runtimeFiles = ["scramjet.js", "scramjet.wasm"];
 const legacyDatabaseOpen = '"$scramjet",1';
-const legacyDatabaseReplacement = '"$classroom-scramjet-v1",2';
+const legacyDatabaseReplacement = '"$classroom-scramjet-v1",3';
 
 rmSync(outputPath, { recursive: true, force: true });
 mkdirSync(outputPath, { recursive: true });
