@@ -9,7 +9,7 @@
 ## Browser navigation fails
 
 - Service workers require HTTPS except on `localhost` and `127.0.0.1`.
-- If an older cached page reports a worker activation timeout, close other Classroom tabs and reload once so the shared worker can update and take control.
+- If an older cached page reports a worker activation timeout after switching versions, close other Classroom tabs and reload once so the selected version's worker can activate.
 - Check the browser console for WebSocket errors connecting to `wss://wisp-server-python-nh0a.onrender.com/`; confirm the Render service is running and accepting connections at `/`.
 - The new-tab UI opens before the proxy transport initializes. A proxied page that has not loaded after 30 seconds shows a timeout; retry after checking the worker and Wisp connection.
 - Some upstream sites can block or limit traffic based on hosting IP, network policy, or request volume; this is outside the browser UI's control.
