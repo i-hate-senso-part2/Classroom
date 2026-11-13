@@ -1010,7 +1010,7 @@ async function prepareTransport() {
 					prefix: legacyScramjetPrefix,
 					files: {
 						wasm: "/scram/scramjet.wasm.wasm",
-						all: "/scram/scramjet.all.js",
+						all: "/scram-v1/scramjet.all.js",
 						sync: "/scram/scramjet.sync.js",
 					},
 				});
