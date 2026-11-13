@@ -885,14 +885,18 @@ function setLoading(isLoading, tab = activeTab()) {
 	if (tab.id === activeTabId) progress.classList.toggle("loading", isLoading);
 }
 
-function waitForTransportStage(promise, stage) {
+function waitForTransportStage(
+	promise,
+	stage,
+	timeoutMs = transportStageTimeout
+) {
 	let timeout;
 	return Promise.race([
 		promise,
 		new Promise((_, reject) => {
 			timeout = window.setTimeout(
 				() => reject(new Error(`${stage} timed out. Reload and try again.`)),
-				transportStageTimeout
+				timeoutMs
 			);
 		}),
 	]).finally(() => window.clearTimeout(timeout));
@@ -992,7 +996,8 @@ async function prepareTransport() {
 			);
 			const registration = await waitForTransportStage(
 				registerSW(),
-				"Scramjet service worker"
+				"Scramjet service worker",
+				serviceWorkerTimeout * 2
 			);
 			const serviceWorker = navigator.serviceWorker.controller;
 			if (!serviceWorker)

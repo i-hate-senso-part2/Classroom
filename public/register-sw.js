@@ -1,8 +1,6 @@
 "use strict";
-const serviceWorkerScriptVersion = "schema-bootstrap-20261113";
-const serviceWorkerFile =
-	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "sw-v1.js" : "sw.js";
-const stockSW = `./${serviceWorkerFile}?v=${serviceWorkerScriptVersion}`;
+const serviceWorkerScriptVersion = "shared-runtime-20261113";
+const stockSW = `./sw.js?v=${serviceWorkerScriptVersion}`;
 const serviceWorkerTimeout = 15000;
 
 /**
@@ -29,82 +27,7 @@ async function registerSW() {
 	const registration = await navigator.serviceWorker.register(stockSW, {
 		updateViaCache: "none",
 	});
-	const activeWorker =
-		registration.active?.scriptURL === expectedScript
-			? registration.active
-			: null;
-	let worker = activeWorker
-		? null
-		: registration.installing || registration.waiting;
-	if (!worker && !activeWorker) {
-		worker = await new Promise((resolve, reject) => {
-			let timeout;
-			const cleanup = () => {
-				window.clearTimeout(timeout);
-				registration.removeEventListener("updatefound", onUpdateFound);
-			};
-			const onUpdateFound = () => {
-				const installing = registration.installing;
-				if (!installing) return;
-				cleanup();
-				resolve(installing);
-			};
-			registration.addEventListener("updatefound", onUpdateFound);
-			timeout = window.setTimeout(() => {
-				cleanup();
-				reject(
-					new Error(
-						"Timed out waiting for the selected Scramjet worker update."
-					)
-				);
-			}, serviceWorkerTimeout);
-			if (registration.installing) onUpdateFound();
-			registration.update().catch((error) => {
-				cleanup();
-				reject(error);
-			});
-		});
-	}
-	if (worker) {
-		if (worker.scriptURL !== expectedScript) {
-			throw new Error(
-				"The browser activated a different Scramjet service worker."
-			);
-		}
-		if (worker.state !== "activated") {
-			await new Promise((resolve, reject) => {
-				let timeout;
-				const cleanup = () => {
-					window.clearTimeout(timeout);
-					worker.removeEventListener("statechange", onStateChange);
-				};
-				const onStateChange = () => {
-					if (worker.state === "activated") {
-						cleanup();
-						resolve();
-					} else if (worker.state === "redundant") {
-						cleanup();
-						reject(new Error("Scramjet service worker failed to activate."));
-					} else if (worker.state === "installed") {
-						worker.postMessage({ type: "CLASSROOM_SKIP_WAITING" });
-					}
-				};
-				worker.addEventListener("statechange", onStateChange);
-				timeout = window.setTimeout(() => {
-					cleanup();
-					reject(
-						new Error(
-							`Timed out waiting for the Scramjet worker to activate (state: ${worker.state}).`
-						)
-					);
-				}, serviceWorkerTimeout);
-				onStateChange();
-			});
-		}
-	}
-	if (registration.active?.scriptURL !== expectedScript) {
-		throw new Error("The selected Scramjet service worker is not active.");
-	}
+	await waitForActiveWorker(registration, expectedScript);
 	if (navigator.serviceWorker.controller?.scriptURL !== expectedScript) {
 		await new Promise((resolve, reject) => {
 			let timeout;
@@ -137,4 +60,66 @@ async function registerSW() {
 		});
 	}
 	return registration;
+}
+
+function waitForActiveWorker(registration, expectedScript) {
+	if (
+		registration.active?.scriptURL === expectedScript &&
+		registration.active.state === "activated"
+	) {
+		return Promise.resolve();
+	}
+
+	return new Promise((resolve, reject) => {
+		let timeout;
+		const observedWorkers = new Set();
+		const cleanup = () => {
+			window.clearTimeout(timeout);
+			registration.removeEventListener("updatefound", checkWorker);
+			for (const worker of observedWorkers) {
+				worker.removeEventListener("statechange", checkWorker);
+			}
+		};
+		const fail = (error) => {
+			cleanup();
+			reject(error);
+		};
+		const checkWorker = () => {
+			if (
+				registration.active?.scriptURL === expectedScript &&
+				registration.active.state === "activated"
+			) {
+				cleanup();
+				resolve();
+				return;
+			}
+
+			const worker = registration.installing || registration.waiting;
+			if (worker && !observedWorkers.has(worker)) {
+				observedWorkers.add(worker);
+				worker.addEventListener("statechange", checkWorker);
+			}
+			if (worker?.state === "installed") {
+				worker.postMessage({ type: "CLASSROOM_SKIP_WAITING" });
+			} else if (worker?.state === "redundant") {
+				fail(new Error("Scramjet service worker failed to activate."));
+			}
+		};
+
+		registration.addEventListener("updatefound", checkWorker);
+		timeout = window.setTimeout(() => {
+			const state =
+				registration.installing?.state ||
+				registration.waiting?.state ||
+				registration.active?.state ||
+				"none";
+			fail(
+				new Error(
+					`Timed out waiting for the Scramjet service worker to activate (state: ${state}).`
+				)
+			);
+		}, serviceWorkerTimeout);
+		checkWorker();
+		registration.update().then(checkWorker, fail);
+	});
 }

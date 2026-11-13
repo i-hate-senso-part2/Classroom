@@ -7,7 +7,7 @@
 ## Browser page flow
 
 1. The server serves `public/index.html` and the static files under `public/`.
-2. Before the first proxied navigation, `public/index.js` loads the selected runtime and registers its service worker: `public/sw-v1.js` for V1 or `public/sw.js` for V2. Changing the toolbar selection activates the worker for the selected runtime.
+2. Before the first proxied navigation, `public/index.js` loads the selected runtime and registers the shared `public/sw.js`. The worker loads the V1 runtime only when it receives a same-origin `/~1/` request.
 3. For v2, the page creates a `Controller` with a `LibcurlClient`. For v1.1.0, it creates a `ScramjetController` and configures BareMux with Epoxy. Both use the configured Wisp WebSocket endpoint.
 4. Controller-managed frames and the selected service worker handle proxied navigations; ordinary requests not claimed by Scramjet continue through the normal fetch path.
 
@@ -17,7 +17,7 @@ The browser also polls `/api/admin/browser-state` on load, when the tab becomes 
 
 - `/`: files from `public/`.
 - `/scramjet/`: Scramjet v2 runtime files from its installed package.
-- `/scram/`: Scramjet v1.1.0 runtime files from `public/scram/`. Vercel rewrites old `/scramjet-v1/` requests to this static directory. The V1 service worker only intercepts same-origin `/~1/` proxy URLs, leaving Classroom pages and assets untouched.
+- `/scram/`: Scramjet v1.1.0 runtime files from `public/scram/`. Vercel rewrites old `/scramjet-v1/` requests to this static directory. The shared worker only loads V1 for same-origin `/~1/` proxy URLs, leaving Classroom pages and assets untouched.
 - `/scram-v1/`: generated V1 controller bundle using a separate IndexedDB database at schema version 3.
 - `/controller/`: Scramjet v2 controller API, service worker, and injection scripts from `public/controller/`.
 - `/libcurl/`, `/baremux/`, and `/epoxy/`: transport assets for the selected runtime.

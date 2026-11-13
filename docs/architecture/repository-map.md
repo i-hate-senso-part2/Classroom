@@ -10,8 +10,8 @@ This is the source-of-truth map for the project. Build output, dependency intern
 - `public/index.js`: tabs, navigation, bookmarks, theme, cloaking UI, admin UI, and transport initialization.
 - `public/search.js`: address-bar URL/search normalization.
 - `public/register-sw.js`: service-worker registration and secure-context checks.
-- `public/sw.js`: Scramjet v2 service worker.
-- `public/sw-v1.js`: Scramjet v1-only service worker.
+- `public/sw.js`: shared Scramjet service worker with lazy V1 runtime loading.
+- `public/sw-v1.js`: legacy V1-only worker retained for existing cached registrations.
 - `public/config.js`: loaded by `index.html`, but its settings are not consumed by the browser runtime.
 - `public/browser.css` and `public/index.css`: browser presentation styles.
 - `public/404.html`: not-found page.
