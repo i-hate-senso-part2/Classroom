@@ -1,7 +1,7 @@
 {
-	"name": "Scramjet Demo",
-	"description": "Scramjet Demo App",
-	"repository": "https://github.com/.../Scramjet-Demo",
+	"name": "Classroom",
+	"description": "Classroom browser application",
+	"repository": "https://github.com/i-hate-senso-part2/Classroom",
 	"logo": "https://raw.githubusercontent.com/MercuryWorkshop/scramjet/main/assets/scramjet.png",
-	"keywords": ["scramjet"]
+	"keywords": ["classroom", "scramjet"]
 }

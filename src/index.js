@@ -39,10 +39,15 @@ const adminPasswordConfig =
 			}
 		: null;
 const scryptAsync = promisify(scrypt);
-const kvRestUrl =
-	process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
-const kvRestToken =
-	process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
+const primaryKvUrl = process.env.KV_REST_API_URL || "";
+const primaryKvToken = process.env.KV_REST_API_TOKEN || "";
+const usePrimaryKvConfig = Boolean(primaryKvUrl || primaryKvToken);
+const kvRestUrl = usePrimaryKvConfig
+	? primaryKvUrl
+	: process.env.UPSTASH_REDIS_REST_URL || "";
+const kvRestToken = usePrimaryKvConfig
+	? primaryKvToken
+	: process.env.UPSTASH_REDIS_REST_TOKEN || "";
 const hasKvConfig = Boolean(kvRestUrl && kvRestToken);
 const hasPartialKvConfig = Boolean(kvRestUrl || kvRestToken) && !hasKvConfig;
 const loginAttempts = new Map();
@@ -66,7 +71,11 @@ try {
 	browserState = normalizeBrowserState(
 		JSON.parse(readFileSync(browserStatePath, "utf8"))
 	);
-} catch {}
+} catch (error) {
+	if (error.code !== "ENOENT") {
+		throw new Error("Could not load local browser state.", { cause: error });
+	}
+}
 
 if (!adminPasswordConfig) {
 	console.warn(
@@ -141,11 +150,25 @@ async function kvCommand(command, ...args) {
 		},
 		body: JSON.stringify([command, ...args]),
 	});
-	const payload = await response.json().catch(() => ({}));
+	let payload;
+	try {
+		payload = await response.json();
+	} catch {
+		if (!response.ok) {
+			throw new Error(`KV request failed with ${response.status}.`);
+		}
+		throw new Error("KV response was not valid JSON.");
+	}
+	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+		throw new Error("KV response was invalid.");
+	}
 	if (!response.ok || payload.error) {
 		throw new Error(
 			payload.error || `KV request failed with ${response.status}.`
 		);
+	}
+	if (!Object.hasOwn(payload, "result")) {
+		throw new Error("KV response did not include a result.");
 	}
 	return payload.result;
 }
@@ -619,10 +642,6 @@ fastify.post("/api/admin/refresh", async (request, reply) => {
 });
 
 fastify.post("/api/admin/logout", async (request, reply) => {
-	const cookie = (request.headers.cookie || "")
-		.split(";")
-		.map((part) => part.trim())
-		.find((part) => part.startsWith("classroom_admin="));
 	return reply
 		.header("Set-Cookie", [
 			`classroom_admin=; ${sessionCookieOptions(request, 0)}`,

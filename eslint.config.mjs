@@ -7,5 +7,9 @@ export default [
 			ecmaVersion: "latest",
 			sourceType: "module",
 		},
+		rules: {
+			"no-unreachable": "error",
+			"no-unused-vars": "error",
+		},
 	},
 ];

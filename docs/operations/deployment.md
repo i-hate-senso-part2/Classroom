@@ -15,7 +15,7 @@ The browser connects to the WebSocket-capable Render Wisp service at `wss://wisp
 
 ## Docker
 
-The `Dockerfile` uses Node 18 Alpine, exposes port `8080`, and runs `src/index.js`. It currently installs from `package.json` and `package-lock.json` with npm. By contrast, the project declares pnpm as its package manager. Keep that distinction in mind when updating dependencies or the container build.
+The `Dockerfile` uses Node 20 Alpine, exposes port `8080`, and runs `src/index.js`. It installs from `package.json` and `package-lock.json` with npm. By contrast, the project declares pnpm as its package manager. Keep that distinction in mind when updating dependencies or the container build.
 
 `docker-compose.yml` is only a commented-out older example and does not currently define an active service.
 

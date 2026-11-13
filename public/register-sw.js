@@ -1,7 +1,9 @@
 "use strict";
+const serviceWorkerScriptVersion = "activation-recovery-20261113";
 const stockSW =
-	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "./sw-v1.js" : "./sw.js";
-const serviceWorkerTimeout = 10000;
+	(window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "./sw-v1.js" : "./sw.js") +
+	`?v=${serviceWorkerScriptVersion}`;
+const serviceWorkerTimeout = 30000;
 
 /**
  * List of hostnames that are allowed to run serviceworkers on http://
@@ -85,7 +87,9 @@ async function registerSW() {
 				timeout = window.setTimeout(() => {
 					cleanup();
 					reject(
-						new Error("Timed out waiting for the Scramjet worker to activate.")
+						new Error(
+							`Timed out waiting for the Scramjet worker to activate (state: ${worker.state}).`
+						)
 					);
 				}, serviceWorkerTimeout);
 				onStateChange();

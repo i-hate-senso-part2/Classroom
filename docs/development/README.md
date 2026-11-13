@@ -8,7 +8,7 @@ Follow [local setup](../getting-started/local-setup.md). The package uses ES mod
 
 - `pnpm lint` runs ESLint against `src/`.
 - `pnpm format` runs Prettier across the repository; inspect the resulting diff because it can touch files beyond the code you intended to edit.
-- `pnpm build` is currently a no-op informational command because the Node server has no compilation step.
+- `pnpm build` prepares the Scramjet v2 runtime and isolated v1 bundle under `public/`.
 - There is no package test script at present.
 
 ## Change map

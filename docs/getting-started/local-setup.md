@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js 16 or newer. Node.js 20 is a suitable current baseline.
+- Node.js 20 or newer.
 - pnpm 10.18.3, as declared by the package's `packageManager` field.
 - Git, if cloning the repository.
 
@@ -35,6 +35,6 @@ The script requires a password of at least 12 characters and confirmation. Store
 - `pnpm hash-admin-password`: generate a scrypt password hash for the admin panel.
 - `pnpm lint`: lint `src/` with ESLint.
 - `pnpm format`: format repository files with Prettier.
-- `pnpm build`: reports that no compilation step is required.
+- `pnpm build`: prepares the Scramjet v2 runtime and isolated v1 bundle under `public/`.
 
 The package does not currently define a test script.

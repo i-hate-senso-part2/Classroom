@@ -12,7 +12,7 @@ This is the source-of-truth map for the project. Build output, dependency intern
 - `public/register-sw.js`: service-worker registration and secure-context checks.
 - `public/sw.js`: Scramjet v2 service-worker routing and activation lifecycle.
 - `public/sw-v1.js`: Scramjet v1.1.0 service-worker routing and activation lifecycle.
-- `public/config.js`: separately defined browser config object; currently not loaded by `index.html`.
+- `public/config.js`: loaded by `index.html`, but its settings are not consumed by the browser runtime.
 - `public/browser.css` and `public/index.css`: browser presentation styles.
 - `public/404.html`: not-found page.
 - `public/credits.html`: project credits.
@@ -32,7 +32,7 @@ These runtime directories contain upstream package files; consult the upstream p
 
 - `data/browser-state.json`: local persisted blocked setting, created by the server as needed; ignored by Git.
 - `.env`, `.env.local`: local environment files; do not commit secrets.
-- `.env.example`: environment template. Some Supabase/ban variables currently appear unused by this application; see [configuration](../getting-started/configuration.md).
+- `.env.example`: template for the environment variables consumed by the application; see [configuration](../getting-started/configuration.md).
 
 ## Project and deployment files
 
