@@ -8,7 +8,7 @@
 - **Scramjet v1.1.0** loads its generated, isolated controller bundle under `/scram-v1/`, with its other runtime files under `/scram/` and BareMux/Epoxy under `/baremux/` and `/epoxy/`. Classroom adapts BareMux's header records to Epoxy's header-pair interface. The build gives the V1 bundle its own IndexedDB name and upgrades it to schema version 3. Its service worker creates all required stores before starting the runtime, repairing databases left incomplete by earlier bundles. Vercel also rewrites the former `/scramjet-v1/` URL prefix for compatibility with cached clients.
 - **Wisp** is hosted by `wisp-server-python` on Render at `wss://wisp-server-python-nh0a.onrender.com/`.
 
-When opening TikTok or GeForce NOW on V2, Classroom displays a compatibility alert recommending V1.1.0.
+When opening TikTok or GeForce NOW on V2, Classroom displays a compatibility dialog recommending V1.1.0. The toolbar version picker is a custom keyboard-accessible menu. Administrative confirmations also use Classroom-styled dialogs.
 
 The app pins Scramjet `2.0.67-alpha.2` with its matching controller `0.0.14`; this v2 release is an alpha prerelease. The original v1.1.0 runtime is in `public/scram/`; `scripts/prepare-static-assets.js` generates the isolated V1 controller bundle during builds.
 

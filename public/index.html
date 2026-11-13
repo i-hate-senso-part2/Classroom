@@ -69,9 +69,12 @@
 			})();
 		</script>
 		<script src="config.js" defer></script>
-		<script src="register-sw.js?v=v1-console-noise-20261113" defer></script>
+		<script
+			src="register-sw.js?v=v1-worker-diagnostics-20261113"
+			defer
+		></script>
 		<script src="search.js" defer></script>
-		<script src="index.js?v=v1-baremux-first-20261113" defer></script>
+		<script src="index.js?v=custom-picker-errors-20261113" defer></script>
 	</head>
 
 	<body>
@@ -207,16 +210,53 @@
 								aria-label="Engine options"
 							></div>
 						</div>
-						<label class="scramjet-version-picker">
-							<select
-								id="scramjet-version"
-								aria-label="Scramjet version"
+						<div class="scramjet-version-picker">
+							<button
+								id="scramjet-version-trigger"
+								class="version-picker-trigger"
+								type="button"
+								aria-label="Proxy version"
+								aria-haspopup="listbox"
+								aria-expanded="false"
+								aria-controls="scramjet-version-menu"
 								title="Switching versions reloads open tabs"
 							>
-								<option value="v1">SE (V1.1.0)</option>
-								<option value="v2">SE (V2)</option>
-							</select>
-						</label>
+								<span id="scramjet-version-label"></span>
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<path d="m7 10 5 5 5-5" />
+								</svg>
+							</button>
+							<div
+								id="scramjet-version-menu"
+								class="version-picker-menu"
+								role="listbox"
+								aria-label="Proxy version"
+								hidden
+							>
+								<button
+									class="version-picker-option"
+									type="button"
+									role="option"
+									data-version="v1"
+									aria-selected="false"
+								>
+									<span>SE (V1.1.0)</span>
+									<span class="version-option-note"
+										>TikTok &amp; GeForce NOW</span
+									>
+								</button>
+								<button
+									class="version-picker-option"
+									type="button"
+									role="option"
+									data-version="v2"
+									aria-selected="false"
+								>
+									<span>SE (V2)</span>
+									<span class="version-option-note">Newer engine</span>
+								</button>
+							</div>
+						</div>
 						<button
 							id="save-bookmark"
 							class="icon-button bookmark-button"
@@ -320,9 +360,31 @@
 					</footer>
 				</section>
 				<div id="frame-host" class="frame-host"></div>
-				<div class="status-block" aria-live="polite" hidden>
-					<p id="sj-error"></p>
-					<pre id="sj-error-code"></pre>
+				<div class="status-block" role="alert" aria-live="assertive" hidden>
+					<div class="status-heading">
+						<span class="status-icon" aria-hidden="true">!</span>
+						<div class="status-copy">
+							<span class="status-kicker"
+								>SCRAMJET <span id="sj-error-version"></span
+							></span>
+							<p id="sj-error"></p>
+						</div>
+						<button
+							id="sj-error-close"
+							class="icon-button"
+							type="button"
+							aria-label="Dismiss error"
+							title="Dismiss"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="m6 6 12 12M18 6 6 18" />
+							</svg>
+						</button>
+					</div>
+					<details id="sj-error-details" class="error-details" hidden>
+						<summary>Error logs</summary>
+						<pre id="sj-error-code"></pre>
+					</details>
 				</div>
 			</main>
 		</div>
@@ -552,6 +614,58 @@
 				</button>
 			</div>
 			<p id="announcement-message" class="announcement-message"></p>
+		</dialog>
+		<dialog
+			id="compatibility-dialog"
+			class="custom-notice-dialog"
+			aria-labelledby="compatibility-title"
+			aria-describedby="compatibility-message"
+		>
+			<div class="custom-notice-heading">
+				<span class="custom-notice-icon" aria-hidden="true">!</span>
+				<div>
+					<span class="dialog-kicker">SITE COMPATIBILITY</span>
+					<h2 id="compatibility-title"></h2>
+				</div>
+			</div>
+			<p id="compatibility-message" class="custom-notice-message"></p>
+			<div class="custom-notice-actions">
+				<button id="compatibility-switch" class="dialog-primary" type="button">
+					Switch to SE (V1.1.0)
+				</button>
+				<button
+					id="compatibility-continue"
+					class="dialog-secondary"
+					type="button"
+				>
+					Continue with V2
+				</button>
+			</div>
+		</dialog>
+		<dialog
+			id="confirmation-dialog"
+			class="custom-notice-dialog"
+			aria-labelledby="confirmation-title"
+			aria-describedby="confirmation-message"
+		>
+			<div class="custom-notice-heading">
+				<span class="custom-notice-icon" aria-hidden="true">?</span>
+				<div>
+					<span class="dialog-kicker">CONFIRM ACTION</span>
+					<h2 id="confirmation-title"></h2>
+				</div>
+			</div>
+			<p id="confirmation-message" class="custom-notice-message"></p>
+			<div class="custom-notice-actions">
+				<button id="confirmation-cancel" class="dialog-secondary" type="button">
+					Cancel
+				</button>
+				<button
+					id="confirmation-accept"
+					class="dialog-primary"
+					type="button"
+				></button>
+			</div>
 		</dialog>
 		<dialog
 			id="user-settings-dialog"

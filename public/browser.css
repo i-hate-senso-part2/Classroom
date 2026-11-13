@@ -362,18 +362,103 @@ textarea:focus-visible {
 	align-items: center;
 }
 .scramjet-version-picker {
+	position: relative;
+	z-index: 31;
 	display: flex;
 	align-items: center;
 }
-.scramjet-version-picker select {
-	max-width: 106px;
-	padding: 6px 7px;
+.version-picker-trigger {
+	min-width: 104px;
+	min-height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 0 9px 0 11px;
 	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--field);
-	color: var(--field-text);
+	border-radius: 10px;
+	background: linear-gradient(180deg, var(--chrome-raised), var(--field));
+	color: var(--text);
 	font: inherit;
 	font-size: 0.76rem;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+	transition:
+		border-color 160ms ease,
+		background 160ms ease,
+		box-shadow 160ms ease;
+}
+.version-picker-trigger:hover,
+.scramjet-version-picker.open .version-picker-trigger {
+	border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+	background: var(--hover);
+}
+.version-picker-trigger:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 17%, transparent);
+}
+.version-picker-trigger svg {
+	width: 15px;
+	height: 15px;
+	flex: 0 0 auto;
+	fill: none;
+	stroke: var(--muted);
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	transition: transform 150ms ease;
+}
+.scramjet-version-picker.open .version-picker-trigger svg {
+	transform: rotate(180deg);
+}
+.version-picker-menu {
+	position: absolute;
+	top: calc(100% + 8px);
+	right: 0;
+	width: 192px;
+	display: grid;
+	gap: 4px;
+	padding: 6px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--menu);
+	box-shadow: 0 16px 38px var(--surface-shadow);
+}
+.version-picker-menu[hidden] {
+	display: none;
+}
+.scramjet-version-picker.open .version-picker-menu {
+	animation: menu-open 150ms ease-out both;
+}
+.version-picker-option {
+	display: grid;
+	gap: 3px;
+	width: 100%;
+	padding: 9px 10px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--menu-text);
+	text-align: left;
+	cursor: pointer;
+}
+.version-picker-option:hover,
+.version-picker-option:focus-visible {
+	border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+	outline: none;
+	background: var(--menu-active);
+}
+.version-picker-option[aria-selected="true"] {
+	background: var(--menu-active);
+	color: var(--accent);
+}
+.version-option-note {
+	color: var(--muted);
+	font-size: 0.66rem;
+}
+.version-picker-option[aria-selected="true"] .version-option-note {
+	color: var(--muted);
 }
 .engine-trigger {
 	width: 31px;
@@ -923,6 +1008,76 @@ textarea:focus-visible {
 .announcement-dialog::backdrop {
 	background: rgba(8, 11, 14, 0.72);
 	backdrop-filter: blur(5px);
+}
+.custom-notice-dialog {
+	width: min(440px, calc(100vw - 32px));
+	padding: 25px;
+	border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+	border-radius: 18px;
+	background:
+		radial-gradient(
+			ellipse at top left,
+			color-mix(in srgb, var(--accent) 10%, transparent),
+			transparent 58%
+		),
+		var(--chrome);
+	color: var(--text);
+	box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+}
+.custom-notice-dialog[open] {
+	animation: dialog-enter 180ms ease-out both;
+}
+.custom-notice-dialog::backdrop {
+	background: rgba(7, 10, 8, 0.72);
+	backdrop-filter: blur(6px);
+}
+.custom-notice-heading {
+	display: flex;
+	align-items: center;
+	gap: 13px;
+	margin-bottom: 15px;
+}
+.custom-notice-icon {
+	width: 40px;
+	height: 40px;
+	flex: 0 0 40px;
+	display: grid;
+	place-items: center;
+	border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--accent) 12%, var(--chrome-raised));
+	color: var(--accent);
+	font-size: 1.15rem;
+	font-weight: 700;
+}
+.custom-notice-heading .dialog-kicker {
+	font-size: 0.62rem;
+}
+.custom-notice-heading h2 {
+	margin: 4px 0 0;
+	font-family: "Manrope", "Inter", sans-serif;
+	font-size: 1.3rem;
+	letter-spacing: -0.025em;
+}
+.custom-notice-message {
+	margin: 0 0 21px;
+	color: var(--muted);
+	font-size: 0.9rem;
+	line-height: 1.6;
+}
+.custom-notice-actions {
+	display: flex;
+	gap: 9px;
+}
+.custom-notice-actions .dialog-primary,
+.custom-notice-actions .dialog-secondary {
+	width: auto;
+	flex: 1;
+	margin: 0;
+	font-size: 0.8rem;
+}
+.custom-notice-actions .dialog-secondary {
+	border-color: var(--line);
 }
 #announcement-dismiss[hidden] {
 	display: none;
@@ -1548,28 +1703,84 @@ html[data-blocked-at-start="true"] .blocked-overlay {
 	left: 50%;
 	z-index: 4;
 	width: min(560px, calc(100% - 36px));
-	padding: 12px 16px;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: var(--chrome);
-	box-shadow: 0 12px 32px var(--surface-shadow);
-	text-align: center;
+	padding: 14px 16px;
+	border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--line));
+	border-radius: 14px;
+	background:
+		radial-gradient(
+			ellipse at top left,
+			color-mix(in srgb, var(--danger) 8%, transparent),
+			transparent 58%
+		),
+		var(--chrome);
+	box-shadow: 0 16px 42px var(--surface-shadow);
 	transform: translateX(-50%);
 }
 .status-block[hidden] {
 	display: none;
 }
+.status-heading {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+}
+.status-icon {
+	width: 34px;
+	height: 34px;
+	flex: 0 0 34px;
+	display: grid;
+	place-items: center;
+	border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--danger) 12%, var(--chrome-raised));
+	color: var(--danger);
+	font-weight: 700;
+}
+.status-copy {
+	min-width: 0;
+	flex: 1;
+}
+.status-kicker {
+	color: var(--muted);
+	font-size: 0.62rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+}
 #sj-error {
-	margin: 0;
+	margin: 3px 0 0;
 	color: var(--danger);
 	font-size: 0.9rem;
 	font-weight: 600;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+.error-details {
+	margin: 12px 0 0 45px;
+	padding-top: 9px;
+	border-top: 1px solid var(--line);
+}
+.error-details[hidden] {
+	display: none;
+}
+.error-details summary {
+	width: fit-content;
+	color: var(--muted);
+	font-size: 0.72rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.error-details summary:hover {
+	color: var(--text);
 }
 #sj-error-code {
-	max-height: 120px;
-	margin: 4px auto 0;
+	max-height: 180px;
+	margin: 8px 0 0;
+	padding: 10px;
 	overflow: auto;
 	color: var(--muted);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--chrome-raised);
 	font:
 		0.78rem/1.45 ui-monospace,
 		SFMono-Regular,
@@ -1686,6 +1897,16 @@ html[data-blocked-at-start="true"] .blocked-overlay {
 	}
 }
 @media (max-width: 520px) {
+	.custom-notice-dialog {
+		padding: 21px;
+	}
+	.custom-notice-actions {
+		flex-direction: column;
+	}
+	.custom-notice-actions .dialog-primary,
+	.custom-notice-actions .dialog-secondary {
+		width: 100%;
+	}
 	#admin-dialog {
 		padding: 18px;
 	}

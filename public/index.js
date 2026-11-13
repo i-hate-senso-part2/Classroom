@@ -23,12 +23,27 @@ const address = document.getElementById("sj-address");
 const homeSearchForm = document.getElementById("home-search-form");
 const homeAddress = document.getElementById("home-address");
 const searchEngine = document.getElementById("sj-search-engine");
-const scramjetVersionSelect = document.getElementById("scramjet-version");
 const scramjetVersion =
 	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "v1" : "v2";
+const versionPicker = document.querySelector(".scramjet-version-picker");
+const versionPickerTrigger = document.getElementById(
+	"scramjet-version-trigger"
+);
+const versionPickerLabel = document.getElementById("scramjet-version-label");
+const versionPickerMenu = document.getElementById("scramjet-version-menu");
+const compatibilityDialog = document.getElementById("compatibility-dialog");
+const compatibilityTitle = document.getElementById("compatibility-title");
+const compatibilityMessage = document.getElementById("compatibility-message");
+const confirmationDialog = document.getElementById("confirmation-dialog");
+const confirmationTitle = document.getElementById("confirmation-title");
+const confirmationMessage = document.getElementById("confirmation-message");
+const confirmationAccept = document.getElementById("confirmation-accept");
 const legacyScramjetPrefix = "/~1/";
 const error = document.getElementById("sj-error");
 const errorCode = document.getElementById("sj-error-code");
+const errorDetails = document.getElementById("sj-error-details");
+const statusBlock = document.querySelector(".status-block");
+const errorVersion = document.getElementById("sj-error-version");
 const tabList = document.getElementById("tab-list");
 const frameHost = document.getElementById("frame-host");
 const homeScreen = document.getElementById("home-screen");
@@ -224,29 +239,98 @@ if (trigger) {
 	});
 }
 
-if (scramjetVersionSelect) {
-	scramjetVersionSelect.value = scramjetVersion;
-	scramjetVersionSelect.addEventListener("change", () => {
-		const nextVersion = scramjetVersionSelect.value;
-		if (!["v1", "v2"].includes(nextVersion)) {
-			scramjetVersionSelect.value = scramjetVersion;
-			return;
-		}
-
-		try {
-			localStorage.setItem("classroom-scramjet-version", nextVersion);
-		} catch (err) {
-			scramjetVersionSelect.value = scramjetVersion;
-			showError(
-				"Unable to save the Scramjet version.",
-				err instanceof Error ? err.message : String(err)
-			);
-			return;
-		}
-
-		location.reload();
-	});
+const versionLabels = { v1: "SE (V1.1.0)", v2: "SE (V2)" };
+versionPickerLabel.textContent = versionLabels[scramjetVersion];
+for (const option of versionPickerMenu.querySelectorAll("[data-version]")) {
+	const selected = option.dataset.version === scramjetVersion;
+	option.setAttribute("aria-selected", String(selected));
+	option.tabIndex = selected ? 0 : -1;
 }
+
+function closeVersionPicker(returnFocus = false) {
+	versionPicker.classList.remove("open");
+	versionPickerMenu.hidden = true;
+	versionPickerTrigger.setAttribute("aria-expanded", "false");
+	if (returnFocus) versionPickerTrigger.focus();
+}
+
+function selectScramjetVersion(nextVersion) {
+	if (!Object.hasOwn(versionLabels, nextVersion)) return;
+	try {
+		localStorage.setItem("classroom-scramjet-version", nextVersion);
+	} catch (err) {
+		closeVersionPicker();
+		showError(
+			"Unable to save the Scramjet version.",
+			err instanceof Error ? err.message : String(err)
+		);
+		return;
+	}
+	location.reload();
+}
+
+versionPickerTrigger.addEventListener("click", () => {
+	const opening = versionPickerMenu.hidden;
+	versionPicker.classList.toggle("open", opening);
+	versionPickerMenu.hidden = !opening;
+	versionPickerTrigger.setAttribute("aria-expanded", String(opening));
+	if (opening) {
+		versionPickerMenu
+			.querySelector(`[data-version="${scramjetVersion}"]`)
+			.focus();
+	}
+});
+versionPickerTrigger.addEventListener("keydown", (event) => {
+	if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+	event.preventDefault();
+	versionPicker.classList.add("open");
+	versionPickerMenu.hidden = false;
+	versionPickerTrigger.setAttribute("aria-expanded", "true");
+	const options = [...versionPickerMenu.querySelectorAll("[data-version]")];
+	const currentIndex = options.findIndex(
+		(option) => option.dataset.version === scramjetVersion
+	);
+	const direction = event.key === "ArrowDown" ? 1 : -1;
+	options[(currentIndex + direction + options.length) % options.length].focus();
+});
+versionPickerMenu.addEventListener("click", (event) => {
+	const option = event.target.closest("[data-version]");
+	if (option) selectScramjetVersion(option.dataset.version);
+});
+versionPickerMenu.addEventListener("keydown", (event) => {
+	const options = [...versionPickerMenu.querySelectorAll("[data-version]")];
+	const index = options.indexOf(document.activeElement);
+	let nextIndex;
+	if (event.key === "ArrowDown") nextIndex = (index + 1) % options.length;
+	else if (event.key === "ArrowUp")
+		nextIndex = (index - 1 + options.length) % options.length;
+	else if (event.key === "Home") nextIndex = 0;
+	else if (event.key === "End") nextIndex = options.length - 1;
+	else if (event.key === "Escape") {
+		event.preventDefault();
+		closeVersionPicker(true);
+		return;
+	} else if (event.key === "Tab") {
+		closeVersionPicker();
+		return;
+	} else {
+		return;
+	}
+	event.preventDefault();
+	options[nextIndex].focus();
+});
+document
+	.getElementById("compatibility-switch")
+	.addEventListener("click", () => selectScramjetVersion("v1"));
+document
+	.getElementById("compatibility-continue")
+	.addEventListener("click", () => compatibilityDialog.close());
+document
+	.getElementById("confirmation-cancel")
+	.addEventListener("click", () => confirmationDialog.close("cancel"));
+confirmationAccept.addEventListener("click", () =>
+	confirmationDialog.close("confirm")
+);
 
 if (menu) {
 	menu.addEventListener("click", (event) => {
@@ -260,6 +344,9 @@ if (menu) {
 document.addEventListener("click", (event) => {
 	if (picker && !picker.contains(event.target)) {
 		togglePicker(false);
+	}
+	if (versionPicker && !versionPicker.contains(event.target)) {
+		closeVersionPicker();
 	}
 });
 
@@ -607,9 +694,11 @@ async function saveAdminAccessSettings() {
 			? `until ${new Date(blockedUntil).toLocaleString()}`
 			: "until you manually unblock visitors";
 		if (
-			!window.confirm(
-				`Block visitor access ${endDescription}? You can still unblock it from Admin.`
-			)
+			!(await showConfirmation({
+				title: "Block visitor access?",
+				message: `Block visitor access ${endDescription}? You can still unblock it from Admin.`,
+				confirmLabel: "Block visitors",
+			}))
 		) {
 			document.getElementById("blocked-toggle").checked = false;
 			return;
@@ -873,10 +962,24 @@ function renderQuickLinks() {
 	}
 }
 
-function showError(message, detail = "") {
+function getErrorLog(error, seen = new Set()) {
+	if (!(error instanceof Error)) return String(error);
+	if (seen.has(error)) return "[Circular error cause]";
+	seen.add(error);
+	const log = error.stack || `${error.name}: ${error.message}`;
+	if (error.cause instanceof Error) {
+		return `${log}\n\nCaused by:\n${getErrorLog(error.cause, seen)}`;
+	}
+	return log;
+}
+
+function showError(message, detail = "", logs = detail) {
 	error.textContent = message;
-	errorCode.textContent = detail;
-	error.parentElement.hidden = !message && !detail;
+	errorCode.textContent = logs;
+	errorVersion.textContent = scramjetVersion === "v1" ? "V1.1.0" : "V2";
+	errorDetails.hidden = !logs;
+	errorDetails.open = false;
+	statusBlock.hidden = !message && !detail && !logs;
 }
 
 function getV2IncompatibleSite(url) {
@@ -895,6 +998,21 @@ function getV2IncompatibleSite(url) {
 		return "GeForce NOW";
 	}
 	return null;
+}
+
+function showConfirmation({ title, message, confirmLabel }) {
+	confirmationTitle.textContent = title;
+	confirmationMessage.textContent = message;
+	confirmationAccept.textContent = confirmLabel;
+	confirmationDialog.returnValue = "";
+	return new Promise((resolve) => {
+		confirmationDialog.addEventListener(
+			"close",
+			() => resolve(confirmationDialog.returnValue === "confirm"),
+			{ once: true }
+		);
+		confirmationDialog.showModal();
+	});
 }
 
 function setLoading(isLoading, tab = activeTab()) {
@@ -1029,9 +1147,9 @@ function updateTabUrl(tab, url) {
 	if (incompatibleSite !== tab.compatibilityWarningSite) {
 		tab.compatibilityWarningSite = incompatibleSite;
 		if (incompatibleSite && tab.id === activeTabId) {
-			window.alert(
-				`${incompatibleSite} does not work correctly on SE (V2). Switch to SE (V1.1.0) from the version menu to use it.`
-			);
+			compatibilityTitle.textContent = `${incompatibleSite} works best on V1`;
+			compatibilityMessage.textContent = `${incompatibleSite} may not work correctly on SE (V2). Switch to SE (V1.1.0) for a better experience.`;
+			if (!compatibilityDialog.open) compatibilityDialog.showModal();
 		}
 	}
 	tab.home = false;
@@ -1239,9 +1357,17 @@ async function navigateTab(tab, url) {
 			tab.navigationTimer = null;
 			setLoading(false, tab);
 			if (tab.id === activeTabId) {
+				const timeoutError = new Error(
+					"Check the selected Scramjet version and transport connection, then retry."
+				);
+				console.error("[Classroom] Proxied page load timed out.", {
+					version: scramjetVersion,
+					error: timeoutError,
+				});
 				showError(
 					"This page is taking too long to load.",
-					"Check the selected Scramjet version and transport connection, then retry."
+					timeoutError.message,
+					getErrorLog(timeoutError)
 				);
 			}
 		}, 30000);
@@ -1249,9 +1375,14 @@ async function navigateTab(tab, url) {
 		syncBrowser();
 	} catch (err) {
 		setLoading(false, tab);
+		console.error("[Classroom] Unable to open proxied page.", {
+			version: scramjetVersion,
+			error: err,
+		});
 		showError(
 			"Unable to open this page.",
-			err instanceof Error ? err.message : String(err)
+			err instanceof Error ? err.message : String(err),
+			getErrorLog(err)
 		);
 	}
 }
@@ -1474,6 +1605,9 @@ async function toggleFullscreen() {
 fullscreenToggle.addEventListener("click", toggleFullscreen);
 fullscreenExit.addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", updateFullscreenState);
+document
+	.getElementById("sj-error-close")
+	.addEventListener("click", () => showError(""));
 announcementDismissButton.addEventListener("click", () => {
 	if (announcementPreviewing) closeAnnouncementPreview();
 	else dismissAnnouncement();
@@ -1632,9 +1766,12 @@ document
 	});
 document.getElementById("refresh-all").addEventListener("click", async () => {
 	if (
-		!window.confirm(
-			"Refresh other open Classroom pages? Their current pages may be interrupted."
-		)
+		!(await showConfirmation({
+			title: "Refresh other pages?",
+			message:
+				"Other open Classroom pages will refresh and may lose their current page.",
+			confirmLabel: "Refresh pages",
+		}))
 	) {
 		return;
 	}
