@@ -21,7 +21,7 @@ This is the source-of-truth map for the project. Build output, dependency intern
 
 - `public/scram/`, `public/baremux/`, and `public/epoxy/`: Scramjet v1.1.0 runtime and transport assets, loaded when selected in the browser toolbar.
 - `public/controller/` and `public/libcurl/`: Scramjet v2 controller and transport assets.
-- Installed Scramjet v2 runtime and the local v1 runtime are served under `/scramjet/` and `/scramjet-v1/`; the remaining controller and transport assets are served from `public/`.
+- The installed Scramjet v2 runtime and local v1 runtime are served under `/scramjet/` and `/scram/`; Vercel rewrites the former `/scramjet-v1/` prefix for cached clients. The remaining controller and transport assets are served from `public/`.
 - `public/logos/`: local images used by quick links, search engines, and tab appearance presets.
 - `public/sj.png`, `public/blocked.png`, and `public/favicon.ico`: brand, restriction-screen, and favicon assets.
 

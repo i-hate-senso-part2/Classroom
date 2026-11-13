@@ -970,9 +970,9 @@ async function prepareTransport() {
 				controller = new ScramjetController({
 					prefix: legacyScramjetPrefix,
 					files: {
-						wasm: "/scramjet-v1/scramjet.wasm.wasm",
-						all: "/scramjet-v1/scramjet.all.js",
-						sync: "/scramjet-v1/scramjet.sync.js",
+						wasm: "/scram/scramjet.wasm.wasm",
+						all: "/scram/scramjet.all.js",
+						sync: "/scram/scramjet.sync.js",
 					},
 				});
 				await controller.init();

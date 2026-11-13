@@ -5,6 +5,10 @@
 	"outputDirectory": "public",
 	"rewrites": [
 		{
+			"source": "/scramjet-v1/:path*",
+			"destination": "/scram/:path*"
+		},
+		{
 			"source": "/api/:path*",
 			"destination": "/api/index"
 		}
