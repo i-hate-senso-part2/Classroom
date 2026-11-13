@@ -1069,20 +1069,6 @@ async function prepareTransport() {
 				window.CLASSROOM_SCRAMJET_RUNTIME_READY,
 				"Scramjet assets"
 			);
-			const registration = await waitForTransportStage(
-				registerSW(),
-				"Scramjet service worker",
-				serviceWorkerTimeout * 2
-			);
-			const serviceWorker = navigator.serviceWorker.controller;
-			if (!serviceWorker)
-				throw new Error("Scramjet service worker is unavailable.");
-			if (serviceWorker.scriptURL !== registration.active?.scriptURL) {
-				throw new Error(
-					"The selected Scramjet service worker is not controlling this page."
-				);
-			}
-
 			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
 			if (scramjetVersion === "v1") {
 				if (
@@ -1091,11 +1077,6 @@ async function prepareTransport() {
 				) {
 					throw new Error(
 						"Scramjet v1 transport assets did not initialize. Reload the page and try again."
-					);
-				}
-				if (typeof window.$scramjetLoadController !== "function") {
-					throw new Error(
-						"Scramjet v1 controller API did not load. Reload the page and try again."
 					);
 				}
 				const connection = new window.BareMux.BareMuxConnection(
@@ -1134,7 +1115,28 @@ async function prepareTransport() {
 					connection.setRemoteTransport(transport, "EpoxyTransport"),
 					"Scramjet v1 transport setup"
 				);
+			}
 
+			const registration = await waitForTransportStage(
+				registerSW(),
+				"Scramjet service worker",
+				serviceWorkerTimeout * 2
+			);
+			const serviceWorker = navigator.serviceWorker.controller;
+			if (!serviceWorker)
+				throw new Error("Scramjet service worker is unavailable.");
+			if (serviceWorker.scriptURL !== registration.active?.scriptURL) {
+				throw new Error(
+					"The selected Scramjet service worker is not controlling this page."
+				);
+			}
+
+			if (scramjetVersion === "v1") {
+				if (typeof window.$scramjetLoadController !== "function") {
+					throw new Error(
+						"Scramjet v1 controller API did not load. Reload the page and try again."
+					);
+				}
 				const { ScramjetController } = window.$scramjetLoadController();
 				if (typeof ScramjetController !== "function") {
 					throw new Error("Scramjet v1 controller is unavailable.");
