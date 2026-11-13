@@ -879,6 +879,24 @@ function showError(message, detail = "") {
 	error.parentElement.hidden = !message && !detail;
 }
 
+function getV2IncompatibleSite(url) {
+	if (scramjetVersion !== "v2") return null;
+	let hostname;
+	try {
+		hostname = new URL(url).hostname.toLowerCase();
+	} catch {
+		return null;
+	}
+
+	if (hostname === "tiktok.com" || hostname.endsWith(".tiktok.com")) {
+		return "TikTok";
+	}
+	if (hostname === "geforcenow.com" || hostname.endsWith(".geforcenow.com")) {
+		return "GeForce NOW";
+	}
+	return null;
+}
+
 function setLoading(isLoading, tab = activeTab()) {
 	if (!tab) return;
 	tab.loading = isLoading;
@@ -1007,6 +1025,15 @@ function recordHistory(tab, url) {
 
 function updateTabUrl(tab, url) {
 	if (!url) return;
+	const incompatibleSite = getV2IncompatibleSite(url);
+	if (incompatibleSite !== tab.compatibilityWarningSite) {
+		tab.compatibilityWarningSite = incompatibleSite;
+		if (incompatibleSite && tab.id === activeTabId) {
+			window.alert(
+				`${incompatibleSite} does not work correctly on SE (V2). Switch to SE (V1.1.0) from the version menu to use it.`
+			);
+		}
+	}
 	tab.home = false;
 	tab.url = url;
 	try {
@@ -1241,6 +1268,7 @@ function createTab() {
 		history: [],
 		historyIndex: -1,
 		loading: false,
+		compatibilityWarningSite: null,
 	};
 	tabs.push(tab);
 	activeTabId = tab.id;
