@@ -1180,6 +1180,9 @@ document
 	.getElementById("admin-open")
 	.addEventListener("click", openAdminDialog);
 document
+	.getElementById("blocked-admin-open")
+	.addEventListener("click", openAdminDialog);
+document
 	.getElementById("admin-close")
 	.addEventListener("click", () => adminDialog.close());
 document

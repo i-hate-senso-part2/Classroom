@@ -1506,6 +1506,31 @@ html:fullscreen .browser-stage {
 .blocked-overlay[hidden] {
 	display: none;
 }
+.blocked-admin-open {
+	position: absolute;
+	top: calc(env(safe-area-inset-top, 0px) + 12px);
+	right: calc(env(safe-area-inset-right, 0px) + 12px);
+	display: none;
+	align-items: center;
+	gap: 7px;
+	padding: 9px 13px;
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 999px;
+	background: rgba(25, 30, 35, 0.88);
+	color: #fff;
+	font: inherit;
+	font-size: 0.85rem;
+	cursor: pointer;
+}
+.blocked-admin-open svg {
+	width: 17px;
+	height: 17px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
 html[data-blocked-at-start="true"] .startup-screen {
 	display: none !important;
 }
@@ -1538,6 +1563,11 @@ html[data-blocked-at-start="true"] .blocked-overlay {
 }
 .status-block[hidden] {
 	display: none;
+}
+@media (pointer: coarse) {
+	.blocked-admin-open {
+		display: inline-flex;
+	}
 }
 #sj-error {
 	margin: 0;
