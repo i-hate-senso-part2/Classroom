@@ -917,6 +917,31 @@ function fetchWithTimeout(url, options, timeout, stage) {
 		.finally(() => window.clearTimeout(timer));
 }
 
+function toEpoxyHeaders(headers) {
+	if (!headers) return [];
+	if (typeof headers[Symbol.iterator] === "function") {
+		return Array.from(headers, ([name, value]) => [name, value]);
+	}
+	return Object.entries(headers).flatMap(([name, value]) =>
+		(Array.isArray(value) ? value : [value]).map((entry) => [name, entry])
+	);
+}
+
+function toBareHeaders(headers) {
+	const result = Object.create(null);
+	for (const [name, value] of toEpoxyHeaders(headers)) {
+		const key = name.toLowerCase();
+		if (!Object.hasOwn(result, key)) {
+			result[key] = value;
+		} else if (Array.isArray(result[key])) {
+			result[key].push(value);
+		} else {
+			result[key] = [result[key], value];
+		}
+	}
+	return result;
+}
+
 function recordHistory(tab, url) {
 	if (!url || tab.history[tab.historyIndex] === url) return;
 	if (tab.history[tab.historyIndex - 1] === url) {
@@ -1027,11 +1052,36 @@ async function prepareTransport() {
 					"/baremux/worker.js"
 				);
 				const EpoxyTransport = window.EpoxyTransport.default;
+				const epoxyTransport = new EpoxyTransport({ wisp: wispUrl });
+				const transport = {
+					get ready() {
+						return epoxyTransport.ready;
+					},
+					init: () => epoxyTransport.init(),
+					request: async (remote, method, body, headers, signal) => {
+						const response = await epoxyTransport.request(
+							remote,
+							method,
+							body,
+							toEpoxyHeaders(headers),
+							signal
+						);
+						return {
+							...response,
+							headers: toBareHeaders(response.headers),
+						};
+					},
+					connect: (url, protocols, headers, ...handlers) =>
+						epoxyTransport.connect(
+							url,
+							protocols,
+							toEpoxyHeaders(headers),
+							...handlers
+						),
+					meta: () => epoxyTransport.meta(),
+				};
 				await waitForTransportStage(
-					connection.setRemoteTransport(
-						new EpoxyTransport({ wisp: wispUrl }),
-						"EpoxyTransport"
-					),
+					connection.setRemoteTransport(transport, "EpoxyTransport"),
 					"Scramjet v1 transport setup"
 				);
 

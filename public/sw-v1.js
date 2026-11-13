@@ -41,22 +41,14 @@ const databaseReady = new Promise((resolve, reject) => {
 	});
 });
 
-let scramjet;
-
-async function getScramjet() {
-	await databaseReady;
-	if (!scramjet) {
-		const { ScramjetServiceWorker } = $scramjetLoadWorker();
-		scramjet = new ScramjetServiceWorker();
-	}
-	return scramjet;
-}
+const { ScramjetServiceWorker } = $scramjetLoadWorker();
+const scramjet = new ScramjetServiceWorker();
 
 async function handleRequest(event) {
-	const runtime = await getScramjet();
-	await runtime.loadConfig();
-	if (runtime.route(event)) {
-		return runtime.fetch(event);
+	await databaseReady;
+	await scramjet.loadConfig();
+	if (scramjet.route(event)) {
+		return scramjet.fetch(event);
 	}
 	return fetch(event.request);
 }
