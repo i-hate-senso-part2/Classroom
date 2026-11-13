@@ -1,6 +1,8 @@
 "use strict";
-const serviceWorkerScriptVersion = "unified-routing-20261113";
-const stockSW = `./sw.js?v=${serviceWorkerScriptVersion}`;
+const serviceWorkerScriptVersion = "versioned-routing-20261113";
+const serviceWorkerFile =
+	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "sw-v1.js" : "sw.js";
+const stockSW = `./${serviceWorkerFile}?v=${serviceWorkerScriptVersion}`;
 const serviceWorkerTimeout = 15000;
 
 /**
