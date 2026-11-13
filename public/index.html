@@ -34,11 +34,7 @@
 
 				const sources =
 					version === "v1"
-						? [
-								"/scram/scramjet.bundle.js",
-								"/baremux/index.js",
-								"/epoxy/index.js",
-							]
+						? ["/scram/scramjet.all.js", "/baremux/index.js", "/epoxy/index.js"]
 						: [
 								"/scramjet/scramjet.js",
 								"/controller/controller.api.js",
@@ -61,7 +57,7 @@
 		<script src="config.js" defer></script>
 		<script src="register-sw.js" defer></script>
 		<script src="search.js" defer></script>
-		<script src="index.js?v=v1-static-path-20261113" defer></script>
+		<script src="index.js?v=v1-controller-loader-20261113" defer></script>
 	</head>
 
 	<body>

@@ -957,6 +957,19 @@ async function prepareTransport() {
 
 			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
 			if (scramjetVersion === "v1") {
+				if (
+					typeof window.BareMux?.BareMuxConnection !== "function" ||
+					typeof window.EpoxyTransport?.default !== "function"
+				) {
+					throw new Error(
+						"Scramjet v1 transport assets did not initialize. Reload the page and try again."
+					);
+				}
+				if (typeof window.$scramjetLoadController !== "function") {
+					throw new Error(
+						"Scramjet v1 controller API did not load. Reload the page and try again."
+					);
+				}
 				const connection = new window.BareMux.BareMuxConnection(
 					"/baremux/worker.js"
 				);
@@ -967,6 +980,9 @@ async function prepareTransport() {
 				);
 
 				const { ScramjetController } = window.$scramjetLoadController();
+				if (typeof ScramjetController !== "function") {
+					throw new Error("Scramjet v1 controller is unavailable.");
+				}
 				controller = new ScramjetController({
 					prefix: legacyScramjetPrefix,
 					files: {
@@ -980,6 +996,12 @@ async function prepareTransport() {
 			}
 
 			const api = window.$scramjetController;
+			if (typeof api?.Controller !== "function") {
+				throw new Error("Scramjet v2 controller API did not load.");
+			}
+			if (typeof window.LibcurlTransport?.LibcurlClient !== "function") {
+				throw new Error("Scramjet v2 transport asset did not load.");
+			}
 			api.config.injectPath = "/controller/controller.inject.js";
 			api.config.scramjetPath = "/scramjet/scramjet.js";
 			api.config.wasmPath = "/scramjet/scramjet.wasm";
