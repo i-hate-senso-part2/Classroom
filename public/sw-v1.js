@@ -43,13 +43,30 @@ const databaseReady = new Promise((resolve, reject) => {
 
 const { ScramjetServiceWorker } = $scramjetLoadWorker();
 const scramjet = new ScramjetServiceWorker();
+let scramjetConfigReady;
+
+function ensureScramjetConfig() {
+	if (!scramjetConfigReady) {
+		scramjetConfigReady = (async () => {
+			await databaseReady;
+			// A loadConfig message sets instance.config but skips Scramjet's global config initialization.
+			scramjet.config = undefined;
+			await scramjet.loadConfig();
+			if (!scramjet.config) {
+				throw new Error(
+					"Scramjet V1 configuration was not saved by the controller."
+				);
+			}
+		})().catch((error) => {
+			scramjetConfigReady = undefined;
+			throw error;
+		});
+	}
+	return scramjetConfigReady;
+}
 
 async function handleRequest(event) {
-	await databaseReady;
-	await scramjet.loadConfig();
-	if (!scramjet.config) {
-		throw new Error("Scramjet V1 configuration is missing in the service worker.");
-	}
+	await ensureScramjetConfig();
 	if (scramjet.route(event)) {
 		return scramjet.fetch(event);
 	}
@@ -66,13 +83,7 @@ self.addEventListener("message", (event) => {
 	} else if (event.data?.type === "CLASSROOM_V1_CONFIG_READY") {
 		event.waitUntil(
 			(async () => {
-				await databaseReady;
-				await scramjet.loadConfig();
-				if (!scramjet.config) {
-					throw new Error(
-						"Scramjet V1 configuration was not saved by the controller."
-					);
-				}
+				await ensureScramjetConfig();
 				event.ports[0]?.postMessage({ ready: true });
 			})().catch((error) => {
 				event.ports[0]?.postMessage({ error: error.message });
