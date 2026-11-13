@@ -1,5 +1,5 @@
 "use strict";
-const serviceWorkerScriptVersion = "v1-config-init-20261113";
+const serviceWorkerScriptVersion = "v1-console-noise-20261113";
 const serviceWorkerFile =
 	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "sw-v1.js" : "sw.js";
 const stockSW = `./${serviceWorkerFile}?v=${serviceWorkerScriptVersion}`;

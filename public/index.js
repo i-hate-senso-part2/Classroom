@@ -1146,6 +1146,9 @@ async function prepareTransport() {
 						all: "/scram-v1/scramjet.all.js",
 						sync: "/scram/scramjet.sync.js",
 					},
+					flags: {
+						captureErrors: false,
+					},
 				});
 				await waitForTransportStage(
 					controller.init(),

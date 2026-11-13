@@ -2,6 +2,7 @@ importScripts("/scram-v1/scramjet.all.js");
 
 const scramjetDatabaseName = "$classroom-scramjet-v1";
 const scramjetDatabaseVersion = 3;
+const scramjetWasmPath = "/scram/scramjet.wasm.wasm";
 const scramjetDatabaseStores = [
 	"config",
 	"cookies",
@@ -100,7 +101,8 @@ self.addEventListener("fetch", (event) => {
 	const requestUrl = new URL(event.request.url);
 	if (
 		requestUrl.origin !== self.location.origin ||
-		!requestUrl.pathname.startsWith("/~1/")
+		(!requestUrl.pathname.startsWith("/~1/") &&
+			requestUrl.pathname !== scramjetWasmPath)
 	) {
 		return;
 	}
