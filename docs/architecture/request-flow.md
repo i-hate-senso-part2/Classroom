@@ -18,7 +18,7 @@ The browser also polls `/api/admin/browser-state` on load, when the tab becomes 
 - `/`: files from `public/`.
 - `/scramjet/`: Scramjet v2 runtime files from its installed package.
 - `/scramjet-v1/`: Scramjet v1.1.0 runtime files from `public/scram/`.
-- `/scramjet-controller/`: Scramjet v2 controller API, service worker, and injection scripts from `public/controller/`.
+- `/controller/`: Scramjet v2 controller API, service worker, and injection scripts from `public/controller/`.
 - `/libcurl/`, `/baremux/`, and `/epoxy/`: transport assets for the selected runtime.
 - `/wisp/`: WebSocket transport endpoint, not a static directory.
 

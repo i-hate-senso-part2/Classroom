@@ -980,7 +980,7 @@ async function prepareTransport() {
 			}
 
 			const api = window.$scramjetController;
-			api.config.injectPath = "/scramjet-controller/controller.inject.js";
+			api.config.injectPath = "/controller/controller.inject.js";
 			api.config.scramjetPath = "/scramjet/scramjet.js";
 			api.config.wasmPath = "/scramjet/scramjet.wasm";
 			const transport = new window.LibcurlTransport.LibcurlClient({
