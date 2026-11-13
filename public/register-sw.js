@@ -24,7 +24,9 @@ async function registerSW() {
 	}
 
 	const expectedScript = new URL(stockSW, location.href).href;
-	const registration = await navigator.serviceWorker.register(stockSW);
+	const registration = await navigator.serviceWorker.register(stockSW, {
+		updateViaCache: "none",
+	});
 	let worker = registration.installing || registration.waiting;
 	if (!worker && registration.active?.scriptURL !== expectedScript) {
 		worker = await new Promise((resolve, reject) => {
@@ -88,7 +90,6 @@ async function registerSW() {
 			});
 		}
 	}
-	await navigator.serviceWorker.ready;
 	if (registration.active?.scriptURL !== expectedScript) {
 		throw new Error("The selected Scramjet service worker is not active.");
 	}

@@ -20,5 +20,12 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+	const requestUrl = new URL(event.request.url);
+	if (
+		requestUrl.origin !== self.location.origin ||
+		!requestUrl.pathname.startsWith("/~1/")
+	) {
+		return;
+	}
 	event.respondWith(handleRequest(event));
 });

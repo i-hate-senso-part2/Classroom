@@ -113,6 +113,7 @@ let activeTabId = null;
 let tabSequence = 0;
 let controller;
 let controllerReady;
+const transportStageTimeout = 15000;
 let settingsDraft = null;
 let bookmarks = [];
 let sharedLinks = [];
@@ -881,6 +882,19 @@ function setLoading(isLoading, tab = activeTab()) {
 	if (tab.id === activeTabId) progress.classList.toggle("loading", isLoading);
 }
 
+function waitForTransportStage(promise, stage) {
+	let timeout;
+	return Promise.race([
+		promise,
+		new Promise((_, reject) => {
+			timeout = window.setTimeout(
+				() => reject(new Error(`${stage} timed out. Reload and try again.`)),
+				transportStageTimeout
+			);
+		}),
+	]).finally(() => window.clearTimeout(timeout));
+}
+
 function recordHistory(tab, url) {
 	if (!url || tab.history[tab.historyIndex] === url) return;
 	if (tab.history[tab.historyIndex - 1] === url) {
@@ -947,13 +961,19 @@ function createFrame(tab) {
 async function prepareTransport() {
 	if (!controllerReady) {
 		const initialization = (async () => {
-			await window.CLASSROOM_SCRAMJET_RUNTIME_READY;
+			await waitForTransportStage(
+				window.CLASSROOM_SCRAMJET_RUNTIME_READY,
+				"Scramjet assets"
+			);
 			const registration = await registerSW();
-			await navigator.serviceWorker.ready;
-			const serviceWorker =
-				navigator.serviceWorker.controller || registration.active;
+			const serviceWorker = navigator.serviceWorker.controller;
 			if (!serviceWorker)
 				throw new Error("Scramjet service worker is unavailable.");
+			if (serviceWorker.scriptURL !== registration.active?.scriptURL) {
+				throw new Error(
+					"The selected Scramjet service worker is not controlling this page."
+				);
+			}
 
 			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
 			if (scramjetVersion === "v1") {
@@ -974,9 +994,12 @@ async function prepareTransport() {
 					"/baremux/worker.js"
 				);
 				const EpoxyTransport = window.EpoxyTransport.default;
-				await connection.setRemoteTransport(
-					new EpoxyTransport({ wisp: wispUrl }),
-					"EpoxyTransport"
+				await waitForTransportStage(
+					connection.setRemoteTransport(
+						new EpoxyTransport({ wisp: wispUrl }),
+						"EpoxyTransport"
+					),
+					"Scramjet v1 transport setup"
 				);
 
 				const { ScramjetController } = window.$scramjetLoadController();
@@ -991,7 +1014,10 @@ async function prepareTransport() {
 						sync: "/scram/scramjet.sync.js",
 					},
 				});
-				await controller.init();
+				await waitForTransportStage(
+					controller.init(),
+					"Scramjet v1 controller setup"
+				);
 				return;
 			}
 
@@ -1012,7 +1038,10 @@ async function prepareTransport() {
 				serviceworker: serviceWorker,
 				transport,
 			});
-			await controller.wait();
+			await waitForTransportStage(
+				controller.wait(),
+				"Scramjet v2 controller setup"
+			);
 		})();
 		controllerReady = initialization.catch((error) => {
 			controller = null;
@@ -1518,12 +1547,9 @@ async function finishStartup() {
 		backgroundReady,
 	]);
 	document.getElementById("startup-message").textContent =
-		"Connecting browser transport";
+		`Connecting Scramjet ${scramjetVersion === "v1" ? "V1.1.0" : "V2"} transport`;
 	try {
-		await Promise.race([
-			prepareTransport(),
-			new Promise((resolve) => window.setTimeout(resolve, 12000)),
-		]);
+		await prepareTransport();
 	} catch (error) {
 		showError("Browser transport is not ready yet.", error.message);
 	}
