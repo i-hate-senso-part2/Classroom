@@ -8,8 +8,8 @@
 		"node": ">=16.0.0"
 	},
 	"scripts": {
-		"build": "echo 'No build compilation step required for Node server'",
-		"start": "node src/index.js",
+		"build": "node scripts/prepare-static-assets.js",
+		"start": "npm run build && node src/index.js",
 		"hash-admin-password": "node scripts/hash-admin-password.js",
 		"format": "prettier --write .",
 		"lint": "eslint ./src/",

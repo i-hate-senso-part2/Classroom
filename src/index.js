@@ -10,8 +10,6 @@ import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 
-import { scramjetPath } from "@mercuryworkshop/scramjet/path";
-
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
@@ -633,38 +631,34 @@ fastify.post("/api/admin/logout", async (request, reply) => {
 		.send({ authenticated: false });
 });
 
-fastify.register(fastifyStatic, {
-	root: publicPath,
-	decorateReply: true,
-});
+if (!process.env.VERCEL) {
+	fastify.register(fastifyStatic, {
+		root: publicPath,
+		decorateReply: true,
+	});
 
-fastify.register(fastifyStatic, {
-	root: scramjetPath,
-	prefix: "/scramjet/",
-	decorateReply: false,
-});
+	fastify.register(fastifyStatic, {
+		root: legacyScramjetPath,
+		prefix: "/scramjet-v1/",
+		decorateReply: false,
+	});
 
-fastify.register(fastifyStatic, {
-	root: legacyScramjetPath,
-	prefix: "/scramjet-v1/",
-	decorateReply: false,
-});
+	fastify.register(fastifyStatic, {
+		root: scramjetControllerPath,
+		prefix: "/scramjet-controller/",
+		decorateReply: false,
+	});
 
-fastify.register(fastifyStatic, {
-	root: scramjetControllerPath,
-	prefix: "/scramjet-controller/",
-	decorateReply: false,
-});
+	fastify.register(fastifyStatic, {
+		root: libcurlPath,
+		prefix: "/libcurl/",
+		decorateReply: false,
+	});
 
-fastify.register(fastifyStatic, {
-	root: libcurlPath,
-	prefix: "/libcurl/",
-	decorateReply: false,
-});
-
-fastify.setNotFoundHandler((res, reply) => {
-	return reply.code(404).type("text/html").sendFile("404.html");
-});
+	fastify.setNotFoundHandler((res, reply) => {
+		return reply.code(404).type("text/html").sendFile("404.html");
+	});
+}
 
 if (!process.env.VERCEL) {
 	fastify.server.on("listening", () => {

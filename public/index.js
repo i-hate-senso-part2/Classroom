@@ -45,6 +45,9 @@ const announcementDismissButton = document.getElementById(
 const userSettingsDialog = document.getElementById("user-settings-dialog");
 const blockedOverlay = document.getElementById("blocked-overlay");
 let blockExpiryTimer = null;
+let blockedCountdownTimer = null;
+let blockedCountdownDeadline = undefined;
+let savedBlockedState = null;
 const browserClientId =
 	window.crypto?.randomUUID?.() ||
 	`${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -471,6 +474,7 @@ async function refreshAdminPanel() {
 		const result = await adminRequest("/api/admin/state");
 		form.hidden = true;
 		settings.hidden = false;
+		savedBlockedState = result.blocked;
 		document.getElementById("blocked-toggle").checked = result.blocked;
 		document.getElementById("blocked-until").value = formatLocalDateTime(
 			result.blockedUntil
@@ -506,11 +510,7 @@ function updateAdminStatus(state, links) {
 	const access = document.getElementById("admin-status-access");
 	access.textContent = state.blocked ? "Blocked" : "Open";
 	access.dataset.state = state.blocked ? "blocked" : "active";
-	if (state.blocked && state.blockedUntil) {
-		access.title = `Until ${new Date(state.blockedUntil).toLocaleString()}`;
-	} else {
-		access.removeAttribute("title");
-	}
+	updateBlockedCountdown(state);
 	const announcement = document.getElementById("admin-status-announcement");
 	const announcementActive =
 		Boolean(state.announcement) &&
@@ -524,6 +524,57 @@ function updateAdminStatus(state, links) {
 	const store = document.getElementById("admin-status-store");
 	store.textContent = "Online";
 	store.dataset.state = "active";
+}
+
+function updateBlockedCountdown(state) {
+	const detail = document.getElementById("admin-status-access-detail");
+	const deadline =
+		state.blocked && Number.isSafeInteger(state.blockedUntil)
+			? state.blockedUntil
+			: null;
+
+	if (deadline !== blockedCountdownDeadline) {
+		window.clearInterval(blockedCountdownTimer);
+		blockedCountdownTimer = null;
+		blockedCountdownDeadline = deadline;
+	}
+
+	if (deadline === null) {
+		detail.textContent = state.blocked
+			? "No automatic unblock scheduled"
+			: "No active block";
+		return;
+	}
+
+	const renderCountdown = () => {
+		const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+		if (remaining === 0) {
+			detail.textContent = "Unblocking…";
+			window.clearInterval(blockedCountdownTimer);
+			blockedCountdownTimer = null;
+			void refreshAdminStatus();
+			return false;
+		}
+
+		const days = Math.floor(remaining / 86400);
+		const hours = Math.floor((remaining % 86400) / 3600);
+		const minutes = Math.floor((remaining % 3600) / 60);
+		const seconds = remaining % 60;
+		const countdown = days
+			? `${days}d ${hours}h ${minutes}m`
+			: hours
+				? `${hours}h ${minutes}m ${seconds}s`
+				: minutes
+					? `${minutes}m ${seconds}s`
+					: `${seconds}s`;
+		detail.textContent = `Ends ${new Date(deadline).toLocaleString()} · ${countdown}`;
+		return true;
+	};
+
+	const hasTimeRemaining = renderCountdown();
+	if (hasTimeRemaining && !blockedCountdownTimer) {
+		blockedCountdownTimer = window.setInterval(renderCountdown, 1000);
+	}
 }
 
 async function refreshAdminStatus() {
@@ -550,8 +601,21 @@ function formatLocalDateTime(timestamp) {
 async function saveAdminAccessSettings() {
 	const blocked = document.getElementById("blocked-toggle").checked;
 	const blockedUntil = document.getElementById("blocked-until").value;
+	if (blocked && savedBlockedState === false) {
+		const endDescription = blockedUntil
+			? `until ${new Date(blockedUntil).toLocaleString()}`
+			: "until you manually unblock visitors";
+		if (
+			!window.confirm(
+				`Block visitor access ${endDescription}? You can still unblock it from Admin.`
+			)
+		) {
+			document.getElementById("blocked-toggle").checked = false;
+			return;
+		}
+	}
 	try {
-		await adminRequest("/api/admin/blocked", {
+		const result = await adminRequest("/api/admin/blocked", {
 			method: "POST",
 			body: JSON.stringify({
 				blocked,
@@ -559,6 +623,7 @@ async function saveAdminAccessSettings() {
 					blocked && blockedUntil ? new Date(blockedUntil).toISOString() : null,
 			}),
 		});
+		savedBlockedState = result.blocked;
 		if (!blocked) document.getElementById("blocked-until").value = "";
 		const isBlocked = await closeAdminPanelIfBlocked();
 		if (isBlocked) return;
@@ -604,6 +669,19 @@ function scheduleBlockExpiryCheck(blockedUntil) {
 		void refreshBlockedState();
 	}, delay);
 }
+
+blockedOverlay.addEventListener("animationend", (event) => {
+	if (
+		event.target !== blockedOverlay ||
+		event.animationName !== "blocked-overlay-exit"
+	) {
+		return;
+	}
+	blockedOverlay.classList.remove("is-leaving");
+	blockedOverlay.hidden = !document.documentElement.hasAttribute(
+		"data-blocked-at-start"
+	);
+});
 
 function markAnnouncementSeen(id) {
 	seenAnnouncementId = id;
@@ -707,8 +785,16 @@ async function refreshBlockedState() {
 			renderedSharedLinks = sharedLinksState;
 			renderQuickLinks();
 		}
-		blockedOverlay.hidden = !blocked;
 		document.documentElement.toggleAttribute("data-blocked-at-start", blocked);
+		if (blocked) {
+			blockedOverlay.classList.remove("is-leaving");
+			blockedOverlay.hidden = false;
+		} else if (
+			!blockedOverlay.hidden &&
+			!blockedOverlay.classList.contains("is-leaving")
+		) {
+			blockedOverlay.classList.add("is-leaving");
+		}
 		syncAnnouncement(state, blocked);
 		try {
 			if (blocked) {
@@ -1180,9 +1266,6 @@ document
 	.getElementById("admin-open")
 	.addEventListener("click", openAdminDialog);
 document
-	.getElementById("blocked-admin-open")
-	.addEventListener("click", openAdminDialog);
-document
 	.getElementById("admin-close")
 	.addEventListener("click", () => adminDialog.close());
 document
@@ -1383,6 +1466,9 @@ document.addEventListener("keydown", (event) => {
 
 renderQuickLinks();
 createTab();
+if (new URLSearchParams(location.search).get("admin") === "1") {
+	openAdminDialog();
+}
 
 async function finishStartup() {
 	const blocked = await refreshBlockedState();

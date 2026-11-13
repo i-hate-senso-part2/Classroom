@@ -830,6 +830,12 @@ textarea:focus-visible {
 .admin-status-card strong[data-state="blocked"] {
 	color: var(--danger);
 }
+.admin-status-detail {
+	color: var(--muted);
+	font-size: 0.62rem;
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+}
 .admin-section {
 	margin-top: 16px;
 	padding-top: 16px;
@@ -1506,30 +1512,19 @@ html:fullscreen .browser-stage {
 .blocked-overlay[hidden] {
 	display: none;
 }
-.blocked-admin-open {
-	position: absolute;
-	top: calc(env(safe-area-inset-top, 0px) + 12px);
-	right: calc(env(safe-area-inset-right, 0px) + 12px);
-	display: none;
-	align-items: center;
-	gap: 7px;
-	padding: 9px 13px;
-	border: 1px solid rgba(255, 255, 255, 0.3);
-	border-radius: 999px;
-	background: rgba(25, 30, 35, 0.88);
-	color: #fff;
-	font: inherit;
-	font-size: 0.85rem;
-	cursor: pointer;
+.blocked-overlay.is-leaving {
+	animation: blocked-overlay-exit 420ms ease-in forwards;
 }
-.blocked-admin-open svg {
-	width: 17px;
-	height: 17px;
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 1.8;
-	stroke-linecap: round;
-	stroke-linejoin: round;
+@keyframes blocked-overlay-exit {
+	to {
+		opacity: 0;
+		transform: scale(0.985);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.blocked-overlay.is-leaving {
+		animation-duration: 1ms;
+	}
 }
 html[data-blocked-at-start="true"] .startup-screen {
 	display: none !important;
@@ -1563,11 +1558,6 @@ html[data-blocked-at-start="true"] .blocked-overlay {
 }
 .status-block[hidden] {
 	display: none;
-}
-@media (pointer: coarse) {
-	.blocked-admin-open {
-		display: inline-flex;
-	}
 }
 #sj-error {
 	margin: 0;

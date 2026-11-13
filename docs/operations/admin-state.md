@@ -10,7 +10,7 @@ pnpm hash-admin-password
 
 The prompt requires at least 12 characters and confirmation. Set the printed `ADMIN_PASSWORD_HASH` value in ignored `.env.local` for local work, or in your deployment's secret/environment settings. The hash format is `scrypt:<salt-hex>:<digest-hex>`; the server validates the salt and digest lengths before enabling sign-in.
 
-The panel opens through its toolbar control or the Up, Down, Up, Down sequence. Authentication uses a signed HTTP-only cookie with an eight-hour lifetime. Five bad attempts from one IP trigger a 15-minute in-memory lockout.
+The panel opens through its toolbar control or the Up, Down, Up, Down sequence. On mobile or while the blocked screen is active, open `/?admin=1` to bring up the same sign-in dialog; this link does not bypass authentication. Authentication uses a signed HTTP-only cookie with an eight-hour lifetime. Five bad attempts from one IP trigger a 15-minute in-memory lockout.
 
 ## Shared browser settings
 
@@ -20,7 +20,7 @@ The panel opens through its toolbar control or the Up, Down, Up, Down sequence. 
 
 Configure either both `KV_REST_API_URL` and `KV_REST_API_TOKEN`, or both supported `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` aliases. Partial configuration fails closed with an API error.
 
-The admin panel can enable the public blocked screen, allow authenticated admins to bypass it, and schedule an automatic unblock time. The browser requests a state update at the scheduled deadline, and the server clears expired blocks on state requests as a fallback.
+The admin panel can enable the public blocked screen, allow authenticated admins to bypass it, and schedule an automatic unblock time. Enabling a new block requires confirmation, with a specific warning when no end time is scheduled. The access status displays the current state and a live countdown. The browser requests a state update at the scheduled deadline, and the server clears expired blocks on state requests as a fallback.
 
 Admins can post or clear a 500-character announcement popup, choose whether visitors can close it, set a per-visitor auto-close timer, and optionally set a global expiration time. A preview is local to the admin session. Visitors see each announcement once until it is changed; authenticated admins do not see published popups.
 

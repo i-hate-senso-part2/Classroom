@@ -38,7 +38,8 @@ These runtime directories contain upstream package files; consult the upstream p
 - `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `package-lock.json`: package metadata, scripts, and dependency locks. The documented developer workflow uses pnpm; the Dockerfile currently uses npm and `package-lock.json`.
 - `Dockerfile`: container image definition.
 - `docker-compose.yml`: currently commented-out example, not a runnable Compose service.
-- `vercel.json`: routes requests to the Node serverless function.
+- `vercel.json`: serves `public/` as static output and configures cross-origin isolation headers; `/api/*` uses the function in `api/[...path].js`.
+- `scripts/prepare-static-assets.js`: copies the installed Scramjet V2 runtime and Wasm into static output before deployment or local startup.
 - `app.json`, `replit.nix`, `.replit`: Replit metadata and environment settings.
 - `.vercel/`: local Vercel project metadata when present; do not publish secrets from it.
 - `eslint.config.mjs`, `prettier.config.js`, `.prettierignore`: lint and formatting configuration.

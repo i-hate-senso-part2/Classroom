@@ -15,6 +15,7 @@ RUN apk add --upgrade --no-cache python3 make g++
 RUN $NPM_BUILD
 
 COPY . .
+RUN node scripts/prepare-static-assets.js
 
 ENTRYPOINT [ "node" ]
 CMD ["src/index.js"]

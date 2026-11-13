@@ -1,20 +1,21 @@
 {
+	"$schema": "https://openapi.vercel.sh/vercel.json",
 	"version": 2,
-	"builds": [
+	"buildCommand": "npm run build",
+	"outputDirectory": "public",
+	"headers": [
 		{
-			"src": "src/index.js",
-			"use": "@vercel/node",
-			"config": {
-				"includeFiles": [
-					"public/**"
-				]
-			}
-		}
-	],
-	"routes": [
-		{
-			"src": "/(.*)",
-			"dest": "src/index.js"
+			"source": "/:path*",
+			"headers": [
+				{
+					"key": "Cross-Origin-Opener-Policy",
+					"value": "same-origin"
+				},
+				{
+					"key": "Cross-Origin-Embedder-Policy",
+					"value": "require-corp"
+				}
+			]
 		}
 	]
 }
