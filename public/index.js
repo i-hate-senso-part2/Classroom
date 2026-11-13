@@ -1135,6 +1135,12 @@ renderMenu();
 setSearchEngine("google");
 applyUserSettings(userSettings);
 
+address.addEventListener("keydown", (event) => {
+	if (event.key !== "Enter") return;
+	event.preventDefault();
+	form.requestSubmit();
+});
+
 form.addEventListener("submit", (event) => {
 	event.preventDefault();
 	const value = address.value.trim();

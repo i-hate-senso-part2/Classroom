@@ -77,6 +77,8 @@ async function registerSW() {
 					} else if (worker.state === "redundant") {
 						cleanup();
 						reject(new Error("Scramjet service worker failed to activate."));
+					} else if (worker.state === "installed") {
+						worker.postMessage({ type: "CLASSROOM_SKIP_WAITING" });
 					}
 				};
 				worker.addEventListener("statechange", onStateChange);

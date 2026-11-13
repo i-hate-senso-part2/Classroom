@@ -59,12 +59,9 @@
 			})();
 		</script>
 		<script src="config.js" defer></script>
-		<script
-			src="register-sw.js?v=bounded-worker-handoff-20261113"
-			defer
-		></script>
+		<script src="register-sw.js?v=skip-waiting-handoff-20261113" defer></script>
 		<script src="search.js" defer></script>
-		<script src="index.js?v=bounded-transport-init-20261113" defer></script>
+		<script src="index.js?v=toolbar-submit-20261113" defer></script>
 	</head>
 
 	<body>
@@ -175,6 +172,16 @@
 							spellcheck="false"
 							aria-label="Search or enter an address"
 						/>
+						<button
+							class="icon-button address-submit-button"
+							type="submit"
+							title="Search or go"
+							aria-label="Search or go"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M5 12h14m-6-6 6 6-6 6" />
+							</svg>
+						</button>
 						<div class="engine-picker" aria-label="Search engine selector">
 							<button
 								type="button"

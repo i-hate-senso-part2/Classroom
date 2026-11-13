@@ -1645,6 +1645,9 @@ html[data-blocked-at-start="true"] .blocked-overlay {
 		gap: 6px;
 		padding-left: 10px;
 	}
+	.address-submit-button {
+		display: none;
+	}
 	.bookmark-button {
 		display: none;
 	}
