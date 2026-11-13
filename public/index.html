@@ -19,7 +19,12 @@
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
 			href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap"
-			rel="stylesheet"
+			rel="preload"
+			as="style"
+			onload="
+				this.onload = null;
+				this.rel = 'stylesheet';
+			"
 		/>
 		<link rel="stylesheet" href="browser.css" />
 		<script>
@@ -32,36 +37,41 @@
 				} catch {}
 				window.CLASSROOM_SCRAMJET_VERSION = version;
 
-				const sources =
+				const sourceGroups =
 					version === "v1"
 						? [
-								"/scram-v1/scramjet.all.js",
-								"/baremux/index.js",
-								"/epoxy/index.js",
+								["/scram-v1/scramjet.all.js"],
+								["/baremux/index.js", "/epoxy/index.js"],
 							]
 						: [
-								"/scramjet/scramjet.js",
-								"/controller/controller.api.js",
-								"/libcurl/index.js?v=2.0.6",
+								["/scramjet/scramjet.js"],
+								["/controller/controller.api.js", "/libcurl/index.js?v=2.0.6"],
 							];
 				window.CLASSROOM_SCRAMJET_RUNTIME_READY = (async () => {
-					for (const src of sources) {
-						await new Promise((resolve, reject) => {
-							const script = document.createElement("script");
-							script.src = src;
-							script.onload = resolve;
-							script.onerror = () =>
-								reject(new Error(`Unable to load Scramjet asset: ${src}`));
-							document.head.append(script);
-						});
+					for (const sources of sourceGroups) {
+						await Promise.all(
+							sources.map(
+								(src) =>
+									new Promise((resolve, reject) => {
+										const script = document.createElement("script");
+										script.src = src;
+										script.onload = resolve;
+										script.onerror = () =>
+											reject(
+												new Error(`Unable to load Scramjet asset: ${src}`)
+											);
+										document.head.append(script);
+									})
+							)
+						);
 					}
 				})();
 			})();
 		</script>
 		<script src="config.js" defer></script>
-		<script src="register-sw.js?v=activation-recovery-20261113" defer></script>
+		<script src="register-sw.js?v=unified-routing-20261113" defer></script>
 		<script src="search.js" defer></script>
-		<script src="index.js?v=toolbar-submit-20261113" defer></script>
+		<script src="index.js?v=bounded-navigation-20261113" defer></script>
 	</head>
 
 	<body>

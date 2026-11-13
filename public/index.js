@@ -761,9 +761,12 @@ function syncAnnouncement(state, blocked) {
 
 async function refreshBlockedState() {
 	try {
-		const response = await fetch("/api/admin/browser-state", {
-			cache: "no-store",
-		});
+		const response = await fetchWithTimeout(
+			"/api/admin/browser-state",
+			{ cache: "no-store" },
+			10000,
+			"Browser state request"
+		);
 		if (!response.ok) {
 			return document.documentElement.hasAttribute("data-blocked-at-start");
 		}
@@ -895,6 +898,21 @@ function waitForTransportStage(promise, stage) {
 	]).finally(() => window.clearTimeout(timeout));
 }
 
+function fetchWithTimeout(url, options, timeout, stage) {
+	const controller = new AbortController();
+	const timer = window.setTimeout(() => controller.abort(), timeout);
+	return fetch(url, { ...options, signal: controller.signal })
+		.catch((error) => {
+			if (controller.signal.aborted) {
+				throw new Error(
+					`${stage} timed out. Check your connection and try again.`
+				);
+			}
+			throw error;
+		})
+		.finally(() => window.clearTimeout(timer));
+}
+
 function recordHistory(tab, url) {
 	if (!url || tab.history[tab.historyIndex] === url) return;
 	if (tab.history[tab.historyIndex - 1] === url) {
@@ -940,6 +958,13 @@ function createFrame(tab) {
 	frame.element.hidden = true;
 	frame.element.addEventListener("load", () => {
 		try {
+			if (frame.element.contentWindow.location.href === "about:blank") return;
+		} catch {
+			// A cross-origin load is complete even if its URL cannot be inspected.
+		}
+		window.clearTimeout(tab.navigationTimer);
+		tab.navigationTimer = null;
+		try {
 			const frameUrl = new URL(frame.element.contentWindow.location.href);
 			const decodedUrl =
 				scramjetVersion === "v1"
@@ -965,7 +990,10 @@ async function prepareTransport() {
 				window.CLASSROOM_SCRAMJET_RUNTIME_READY,
 				"Scramjet assets"
 			);
-			const registration = await registerSW();
+			const registration = await waitForTransportStage(
+				registerSW(),
+				"Scramjet service worker"
+			);
 			const serviceWorker = navigator.serviceWorker.controller;
 			if (!serviceWorker)
 				throw new Error("Scramjet service worker is unavailable.");
@@ -1054,6 +1082,8 @@ async function prepareTransport() {
 
 async function navigateTab(tab, url) {
 	showError("");
+	window.clearTimeout(tab.navigationTimer);
+	tab.navigationTimer = null;
 	setLoading(true, tab);
 	try {
 		await prepareTransport();
@@ -1062,6 +1092,17 @@ async function navigateTab(tab, url) {
 		const frame = createFrame(tab);
 		frame.element.hidden = tab.id !== activeTabId;
 		frame.go(url);
+		window.clearTimeout(tab.navigationTimer);
+		tab.navigationTimer = window.setTimeout(() => {
+			tab.navigationTimer = null;
+			setLoading(false, tab);
+			if (tab.id === activeTabId) {
+				showError(
+					"This page is taking too long to load.",
+					"Check the selected Scramjet version and transport connection, then retry."
+				);
+			}
+		}, 30000);
 		setLoading(true, tab);
 		syncBrowser();
 	} catch (err) {
@@ -1097,6 +1138,7 @@ function closeTab(tabId) {
 	const index = tabs.findIndex((tab) => tab.id === tabId);
 	if (index < 0) return;
 	const [tab] = tabs.splice(index, 1);
+	window.clearTimeout(tab.navigationTimer);
 	if (tab.frame) tab.frame.element.remove();
 	if (tabs.length === 0) {
 		createTab();
@@ -1109,6 +1151,8 @@ function closeTab(tabId) {
 function goHome() {
 	const tab = activeTab();
 	if (!tab) return;
+	window.clearTimeout(tab.navigationTimer);
+	tab.navigationTimer = null;
 	tab.home = true;
 	tab.title = "New tab";
 	setLoading(false);
@@ -1533,31 +1577,6 @@ async function finishStartup() {
 	if (blocked) {
 		startupScreen.hidden = true;
 		return;
-	}
-	const imagesReady = Promise.all(
-		Array.from(document.images, (image) =>
-			image.decode ? image.decode().catch(() => {}) : Promise.resolve()
-		)
-	);
-	const backgroundReady = userSettings.backgroundImage
-		? new Promise((resolve) => {
-				const image = new Image();
-				image.onload = resolve;
-				image.onerror = resolve;
-				image.src = userSettings.backgroundImage;
-			})
-		: Promise.resolve();
-	await Promise.all([
-		document.fonts?.ready || Promise.resolve(),
-		imagesReady,
-		backgroundReady,
-	]);
-	document.getElementById("startup-message").textContent =
-		`Connecting Scramjet ${scramjetVersion === "v1" ? "V1.1.0" : "V2"} transport`;
-	try {
-		await prepareTransport();
-	} catch (error) {
-		showError("Browser transport is not ready yet.", error.message);
 	}
 	startupScreen.hidden = true;
 }

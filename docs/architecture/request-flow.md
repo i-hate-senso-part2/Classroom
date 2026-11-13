@@ -7,7 +7,7 @@
 ## Browser page flow
 
 1. The server serves `public/index.html` and the static files under `public/`.
-2. Before the first proxied navigation, `public/index.js` loads the selected runtime, registers its service worker, and waits for it to control the page. Changing the toolbar selector reloads the browser so the selected version and worker stay in sync.
+2. Before the first proxied navigation, `public/index.js` loads the selected runtime and registers the shared service worker. It dispatches V1 and V2 proxy paths to their corresponding runtimes, avoiding a service-worker replacement when the toolbar selection changes.
 3. For v2, the page creates a `Controller` with a `LibcurlClient`. For v1.1.0, it creates a `ScramjetController` and configures BareMux with Epoxy. Both use the configured Wisp WebSocket endpoint.
 4. Controller-managed frames and the selected service worker handle proxied navigations; ordinary requests not claimed by Scramjet continue through the normal fetch path.
 

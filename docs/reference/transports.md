@@ -2,7 +2,8 @@
 
 ## Components
 
-- The browser toolbar lets visitors choose **SE (V1.1.0)** or **SE (V2)**. Changing the selection reloads the browser so the matching runtime and service worker are used together.
+- The browser toolbar lets visitors choose **SE (V1.1.0)** or **SE (V2)**. Changing the selection reloads the browser so the matching runtime is initialized.
+- A shared service worker routes V1 `/~1/` requests to the V1 runtime and V2 requests to the V2 controller. Switching versions does not replace the active worker.
 - **Scramjet v2** supplies the browser rewrite runtime from the installed package under `/scramjet/`. Its controller assets are served from `public/controller/` at `/controller/`, and its Libcurl transport is served under `/libcurl/`.
 - **Scramjet v1.1.0** loads its generated, isolated controller bundle under `/scram-v1/`, with its other runtime files under `/scram/` and BareMux/Epoxy under `/baremux/` and `/epoxy/`. The build gives the V1 bundle its own IndexedDB name so stale V1 schemas cannot conflict with a fresh initialization. Vercel also rewrites the former `/scramjet-v1/` URL prefix for compatibility with cached clients.
 - **Wisp** is hosted by `wisp-server-python` on Render at `wss://wisp-server-python-nh0a.onrender.com/`.

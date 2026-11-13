@@ -1,9 +1,7 @@
 "use strict";
-const serviceWorkerScriptVersion = "activation-recovery-20261113";
-const stockSW =
-	(window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "./sw-v1.js" : "./sw.js") +
-	`?v=${serviceWorkerScriptVersion}`;
-const serviceWorkerTimeout = 30000;
+const serviceWorkerScriptVersion = "unified-routing-20261113";
+const stockSW = `./sw.js?v=${serviceWorkerScriptVersion}`;
+const serviceWorkerTimeout = 15000;
 
 /**
  * List of hostnames that are allowed to run serviceworkers on http://
@@ -12,7 +10,7 @@ const swAllowedHostnames = ["localhost", "127.0.0.1"];
 
 /**
  * Global util
- * Used in 404.html and index.html
+ * Used by the browser page to initialize the Scramjet service worker.
  */
 async function registerSW() {
 	if (!navigator.serviceWorker) {
@@ -29,8 +27,14 @@ async function registerSW() {
 	const registration = await navigator.serviceWorker.register(stockSW, {
 		updateViaCache: "none",
 	});
-	let worker = registration.installing || registration.waiting;
-	if (!worker && registration.active?.scriptURL !== expectedScript) {
+	const activeWorker =
+		registration.active?.scriptURL === expectedScript
+			? registration.active
+			: null;
+	let worker = activeWorker
+		? null
+		: registration.installing || registration.waiting;
+	if (!worker && !activeWorker) {
 		worker = await new Promise((resolve, reject) => {
 			let timeout;
 			const cleanup = () => {
