@@ -14,6 +14,8 @@
 - Check the browser console for WebSocket errors connecting to `wss://wisp-server-python-nh0a.onrender.com/`; confirm the Render service is running and accepting connections at `/`.
 - The new-tab UI opens before the proxy transport initializes. A proxied page that has not loaded after 30 seconds shows a timeout; retry after checking the worker and Wisp connection.
 - Some upstream sites can block or limit traffic based on hosting IP, network policy, or request volume; this is outside the browser UI's control.
+- Console errors such as upstream `403`/`500` responses, failed third-party media, unused preload warnings, and embedded-frame COEP or quirks-mode notices usually come from the destination site or its embedded resources. Classroom's own `public/index.html` uses a standards-mode doctype. The app enables COEP for cross-origin isolation; removing it can break runtime features, so do not weaken that policy just to silence warnings from a proxied site.
+- `Unchecked runtime.lastError` messages mentioning a closed message channel are commonly emitted by browser extensions. Try a private window with extensions disabled to distinguish extension noise from application errors.
 
 ## Admin access is unavailable
 

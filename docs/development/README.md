@@ -17,6 +17,11 @@ Server/API behavior belongs in `src/index.js`; browser behavior belongs mainly i
 
 When changing runtime behavior, update the corresponding reference page under `docs/reference/` and the [repository map](../architecture/repository-map.md) if files or responsibilities move.
 
+## UI guides
+
+- [Customizing the homepage](customizing-homepage.md)
+- [Customizing the loading screen](customizing-loading-screen.md)
+
 ## Dependency workflow note
 
 The project declares pnpm and tracks `pnpm-lock.yaml`, while the current Dockerfile uses npm and `package-lock.json`. Check both workflows when changing dependency versions.

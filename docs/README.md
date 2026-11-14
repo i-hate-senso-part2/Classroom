@@ -5,31 +5,39 @@ This documentation covers the application, its runtime, configuration, and repos
 ## Categories
 
 ### Getting started
+
 - [Category index](getting-started/README.md)
 - [Local setup and first run](getting-started/local-setup.md)
 - [Configuration reference](getting-started/configuration.md)
 
 ### Architecture
+
 - [Category index](architecture/README.md)
 - [Application and request flow](architecture/request-flow.md)
 - [Repository map](architecture/repository-map.md)
 
 ### Reference
+
 - [Category index](reference/README.md)
 - [Browser features and controls](reference/browser.md)
 - [HTTP API](reference/api.md)
 - [Proxy and transport components](reference/transports.md)
 
 ### Operations
+
 - [Category index](operations/README.md)
 - [Deployment](operations/deployment.md)
 - [Administrator and browser state](operations/admin-state.md)
 - [Troubleshooting](operations/troubleshooting.md)
 
 ### Development
+
 - [Development workflow](development/README.md)
+- [Customizing the homepage](development/customizing-homepage.md)
+- [Customizing the loading screen](development/customizing-loading-screen.md)
 
 ### Security and privacy
+
 - [Security and privacy notes](security/README.md)
 
 ## Documentation scope

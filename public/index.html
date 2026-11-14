@@ -407,8 +407,8 @@
 		>
 			<div class="dialog-heading">
 				<div>
-					<span class="dialog-kicker">CONTROL ROOM</span>
-					<h2 id="admin-title">Admin console</h2>
+					<span class="dialog-kicker">ADMIN</span>
+					<h2 id="admin-title">Admin settings</h2>
 				</div>
 				<button
 					id="admin-close"
@@ -455,17 +455,16 @@
 						<strong id="admin-status-store">Checking</strong>
 					</div>
 				</div>
-				<section class="admin-section" aria-labelledby="access-heading">
-					<div class="admin-section-heading">
+				<details class="admin-section" aria-labelledby="access-heading" open>
+					<summary class="admin-section-heading">
 						<div>
-							<span class="admin-section-index">01</span>
 							<h3 id="access-heading">Access</h3>
 						</div>
-						<p>
-							Control who can open the browser. Mobile admin link:
-							<code>/?admin=1</code>
-						</p>
-					</div>
+						<p>Manage site availability.</p>
+					</summary>
+					<p class="admin-help">
+						For mobile or a blocked screen, open <code>/?admin=1</code>.
+					</p>
 					<label class="setting-row" for="blocked-toggle">
 						<span>
 							<strong>Block visitors</strong>
@@ -492,15 +491,14 @@
 						</span>
 						<input id="admin-bypass-toggle" type="checkbox" />
 					</label>
-				</section>
-				<section class="admin-section" aria-labelledby="announcement-heading">
-					<div class="admin-section-heading">
+				</details>
+				<details class="admin-section" aria-labelledby="announcement-heading">
+					<summary class="admin-section-heading">
 						<div>
-							<span class="admin-section-index">02</span>
 							<h3 id="announcement-heading">Announcement</h3>
 						</div>
-						<p>Write an update for visitors.</p>
-					</div>
+						<p>Publish a message for visitors.</p>
+					</summary>
 					<form id="admin-announcement-form">
 						<label for="admin-announcement">Message</label>
 						<textarea
@@ -553,15 +551,14 @@
 							<button class="dialog-primary" type="submit">Post update</button>
 						</div>
 					</form>
-				</section>
-				<section class="admin-section" aria-labelledby="links-heading">
-					<div class="admin-section-heading">
+				</details>
+				<details class="admin-section" aria-labelledby="links-heading">
+					<summary class="admin-section-heading">
 						<div>
-							<span class="admin-section-index">03</span>
 							<h3 id="links-heading">Shared quick links</h3>
 						</div>
-						<p>Homepage links for everyone, up to 8.</p>
-					</div>
+						<p>Choose homepage shortcuts.</p>
+					</summary>
 					<form id="admin-links-form">
 						<label for="admin-shared-links">One per line: label | URL</label>
 						<textarea
@@ -574,7 +571,7 @@
 							<button class="dialog-primary" type="submit">Save links</button>
 						</div>
 					</form>
-				</section>
+				</details>
 				<section
 					class="admin-section admin-section-actions"
 					aria-label="Actions"
