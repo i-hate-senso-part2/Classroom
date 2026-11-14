@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 import { hostname } from "node:os";
 import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 import dotenv from "dotenv";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
@@ -23,9 +23,9 @@ const legacyScramjetPath = fileURLToPath(
 const scramjetControllerPath = fileURLToPath(
 	new URL("../public/controller/", import.meta.url)
 );
-const browserStatePath = fileURLToPath(
-	new URL("../data/browser-state.json", import.meta.url)
-);
+const browserStatePath = process.env.BROWSER_STATE_PATH
+	? resolve(process.env.BROWSER_STATE_PATH)
+	: fileURLToPath(new URL("../data/browser-state.json", import.meta.url));
 const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || "";
 const adminPasswordHashParts = adminPasswordHash.split(":");
 const adminPasswordConfig =
@@ -57,6 +57,7 @@ const defaultBrowserState = {
 	blockedUntil: null,
 	adminBypass: false,
 	sharedLinks: [],
+	sharedLinksHistory: [],
 	announcement: "",
 	announcementId: "",
 	announcementDismissible: true,
@@ -256,6 +257,49 @@ function normalizeBrowserState(state) {
 			}
 		}
 	}
+	if (
+		state.sharedLinksHistory !== undefined &&
+		(!Array.isArray(state.sharedLinksHistory) ||
+			state.sharedLinksHistory.length > 10)
+	) {
+		throw new Error("Stored shared quick link history is invalid.");
+	}
+	for (const entry of state.sharedLinksHistory || []) {
+		if (
+			!entry ||
+			!Number.isSafeInteger(entry.changedAt) ||
+			entry.changedAt <= 0 ||
+			!Array.isArray(entry.links) ||
+			entry.links.length > 8
+		) {
+			throw new Error("Stored shared quick link history entry is invalid.");
+		}
+		for (const link of entry.links) {
+			if (
+				!link ||
+				typeof link.label !== "string" ||
+				link.label.trim().length < 1 ||
+				link.label.trim().length > 32 ||
+				typeof link.url !== "string" ||
+				link.url.length > 2048
+			) {
+				throw new Error("Stored shared quick link history is invalid.");
+			}
+			let url;
+			try {
+				url = new URL(link.url);
+			} catch {
+				throw new Error("Stored shared quick link history URL is invalid.");
+			}
+			if (
+				!["http:", "https:"].includes(url.protocol) ||
+				url.username ||
+				url.password
+			) {
+				throw new Error("Stored shared quick link history URL is invalid.");
+			}
+		}
+	}
 	return {
 		...defaultBrowserState,
 		...state,
@@ -362,6 +406,34 @@ export const fastify = Fastify({
 	},
 });
 
+fastify.get("/api/health", async (request, reply) => {
+	let stateStore =
+		!hasKvConfig && process.env.VERCEL
+			? "unconfigured"
+			: hasPartialKvConfig
+				? "misconfigured"
+				: hasKvConfig
+					? "remote"
+					: "local";
+	try {
+		assertStateStorageAvailable();
+		await readCurrentBrowserState();
+	} catch (error) {
+		request.log.error(error);
+		if (stateStore === "local" || stateStore === "remote") {
+			stateStore = "unavailable";
+		}
+	}
+	const healthy = stateStore === "local" || stateStore === "remote";
+	return reply
+		.header("Cache-Control", "no-store")
+		.code(healthy ? 200 : 503)
+		.send({
+			status: healthy ? "ok" : "degraded",
+			stateStore,
+		});
+});
+
 async function sendBrowserState(request, reply) {
 	try {
 		const state = await readCurrentBrowserState();
@@ -440,6 +512,7 @@ fastify.get("/api/admin/state", async (request, reply) => {
 			blockedUntil: state.blockedUntil,
 			adminBypass: state.adminBypass,
 			sharedLinks: state.sharedLinks,
+			sharedLinksHistory: state.sharedLinksHistory,
 			announcement: state.announcement,
 			announcementDismissible: state.announcementDismissible,
 			announcementExpiresAt: state.announcementExpiresAt,
@@ -532,7 +605,21 @@ fastify.post("/api/admin/links", async (request, reply) => {
 		normalizedLinks.push({ label: link.label.trim(), url: url.href });
 	}
 	try {
-		const state = await updateBrowserState({ sharedLinks: normalizedLinks });
+		const current = await readCurrentBrowserState();
+		const linksChanged =
+			JSON.stringify(current.sharedLinks) !== JSON.stringify(normalizedLinks);
+		const history = linksChanged
+			? [
+					{ changedAt: Date.now(), links: normalizedLinks },
+					...current.sharedLinksHistory,
+				].slice(0, 10)
+			: current.sharedLinksHistory;
+		const state = normalizeBrowserState({
+			...current,
+			sharedLinks: normalizedLinks,
+			sharedLinksHistory: history,
+		});
+		await saveBrowserState(state);
 		return reply.send({ sharedLinks: state.sharedLinks });
 	} catch (error) {
 		request.log.error(error);

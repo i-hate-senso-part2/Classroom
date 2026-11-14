@@ -44,6 +44,7 @@ const errorCode = document.getElementById("sj-error-code");
 const errorDetails = document.getElementById("sj-error-details");
 const statusBlock = document.querySelector(".status-block");
 const errorVersion = document.getElementById("sj-error-version");
+const errorSource = document.getElementById("sj-error-source");
 const tabList = document.getElementById("tab-list");
 const frameHost = document.getElementById("frame-host");
 const homeScreen = document.getElementById("home-screen");
@@ -129,9 +130,14 @@ let tabSequence = 0;
 let controller;
 let controllerReady;
 const transportStageTimeout = 15000;
+const wispEndpoints = Array.isArray(window.SCRAMJET_APP_CONFIG?.wispEndpoints)
+	? [...new Set(window.SCRAMJET_APP_CONFIG.wispEndpoints)]
+	: [];
+let nextWispEndpointIndex = 0;
 let settingsDraft = null;
 let bookmarks = [];
 let sharedLinks = [];
+let sharedLinksHistory = [];
 let renderedSharedLinks = "";
 let arrowSequenceIndex = 0;
 const arrowSequence = ["ArrowUp", "ArrowDown", "ArrowUp", "ArrowDown"];
@@ -569,9 +575,11 @@ async function refreshAdminPanel() {
 		);
 		document.getElementById("admin-bypass-toggle").checked = result.adminBypass;
 		const links = Array.isArray(result.sharedLinks) ? result.sharedLinks : [];
+		renderSharedLinksHistory(result.sharedLinksHistory);
 		document.getElementById("admin-shared-links").value = links
 			.map((link) => `${link.label} | ${link.url}`)
 			.join("\n");
+		updateSharedLinksCount();
 		document.getElementById("admin-announcement").value =
 			result.announcement || "";
 		document.getElementById("announcement-dismissible").checked =
@@ -612,6 +620,114 @@ function updateAdminStatus(state, links) {
 	const store = document.getElementById("admin-status-store");
 	store.textContent = "Online";
 	store.dataset.state = "active";
+}
+
+function renderSharedLinksHistory(history) {
+	const select = document.getElementById("shared-links-history");
+	const restoreButton = document.getElementById("restore-shared-links");
+	sharedLinksHistory = Array.isArray(history) ? history.slice(0, 10) : [];
+	const entries = sharedLinksHistory;
+	select.replaceChildren();
+	if (entries.length === 0) {
+		select.add(new Option("No saved changes yet", ""));
+		restoreButton.disabled = true;
+		return;
+	}
+	select.add(new Option("Choose a saved version", ""));
+	for (const [index, entry] of entries.entries()) {
+		const date = new Date(entry.changedAt).toLocaleString();
+		const count = entry.links.length;
+		select.add(
+			new Option(
+				`${date} · ${count} ${count === 1 ? "link" : "links"}`,
+				String(index)
+			)
+		);
+	}
+	restoreButton.disabled = true;
+}
+
+function updateSharedLinksCount() {
+	const lines = document
+		.getElementById("admin-shared-links")
+		.value.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean);
+	const count = document.getElementById("shared-links-count");
+	count.textContent = `${lines.length} of 8 links`;
+	count.classList.toggle("error", lines.length > 8);
+}
+
+function getAdminSharedLinksInput() {
+	const lines = document
+		.getElementById("admin-shared-links")
+		.value.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean);
+	if (lines.length > 8) {
+		throw new Error("You can add up to 8 shared quick links.");
+	}
+	return lines.map((line) => {
+		const separator = line.indexOf("|");
+		if (separator < 1) {
+			throw new Error(
+				"Use one link per line in the format: Label | https://example.com"
+			);
+		}
+		const label = line.slice(0, separator).trim();
+		const value = line.slice(separator + 1).trim();
+		let url;
+		try {
+			url = new URL(value);
+		} catch {
+			throw new Error(
+				`The link for "${label || "unnamed"}" is not a valid URL.`
+			);
+		}
+		if (
+			!label ||
+			label.length > 32 ||
+			!["http:", "https:"].includes(url.protocol) ||
+			url.username ||
+			url.password
+		) {
+			throw new Error(
+				"Use a label up to 32 characters and a safe HTTP(S) URL per line."
+			);
+		}
+		return { label, url: url.href };
+	});
+}
+
+function showSharedLinksPreview(links) {
+	const dialog = document.getElementById("shared-links-preview-dialog");
+	const list = document.getElementById("shared-links-preview");
+	const summary = document.getElementById("shared-links-preview-summary");
+	const combined = [
+		...defaultLinks,
+		...links,
+		...bookmarks.filter((bookmark) => bookmark && bookmark.url),
+	].filter(
+		(link, index, all) =>
+			all.findIndex((candidate) => candidate.url === link.url) === index
+	);
+	list.replaceChildren();
+	if (combined.length === 0) {
+		const empty = document.createElement("li");
+		empty.textContent = "No shortcuts to show.";
+		list.append(empty);
+	}
+	for (const link of combined) {
+		const item = document.createElement("li");
+		const label = document.createElement("strong");
+		const url = document.createElement("span");
+		label.textContent = link.label;
+		url.textContent = link.url;
+		item.append(label, url);
+		list.append(item);
+	}
+	summary.textContent = `${combined.length} shortcuts shown, including built-in links and this browser's bookmarks. Other visitors' bookmarks are private.`;
+	if (!dialog.open) dialog.showModal();
 }
 
 function updateBlockedCountdown(state) {
@@ -960,6 +1076,24 @@ function renderQuickLinks() {
 		button.append(mark, label);
 		quickLinks.append(button);
 	}
+	document.getElementById("quick-links-filter-label").hidden =
+		uniqueLinks.length <= 6;
+	filterQuickLinks();
+}
+
+function filterQuickLinks() {
+	const query = document
+		.getElementById("quick-links-filter")
+		.value.trim()
+		.toLocaleLowerCase();
+	let visibleCount = 0;
+	for (const link of quickLinks.querySelectorAll(".quick-link")) {
+		const matches = link.textContent.toLocaleLowerCase().includes(query);
+		link.hidden = !matches;
+		if (matches) visibleCount++;
+	}
+	document.getElementById("quick-links-empty").hidden =
+		visibleCount > 0 || !query;
 }
 
 function getErrorLog(error, seen = new Set()) {
@@ -973,13 +1107,26 @@ function getErrorLog(error, seen = new Set()) {
 	return log;
 }
 
-function showError(message, detail = "", logs = detail) {
+function showError(message, detail = "", logs = detail, source = "Classroom") {
 	error.textContent = message;
 	errorCode.textContent = logs;
 	errorVersion.textContent = scramjetVersion === "v1" ? "V1.1.0" : "V2";
+	errorSource.textContent = source;
 	errorDetails.hidden = !logs;
 	errorDetails.open = false;
 	statusBlock.hidden = !message && !detail && !logs;
+}
+
+function classifySetupError(error) {
+	const message = error instanceof Error ? error.message : String(error);
+	if (/service.?worker/i.test(message)) return "Service worker";
+	if (/transport|wisp|epoxy|baremux|websocket/i.test(message)) {
+		return "Proxy transport";
+	}
+	if (/scramjet|controller|runtime|wasm/i.test(message)) {
+		return "Classroom runtime";
+	}
+	return "Classroom setup";
 }
 
 function getV2IncompatibleSite(url) {
@@ -1036,6 +1183,104 @@ function waitForTransportStage(
 			);
 		}),
 	]).finally(() => window.clearTimeout(timeout));
+}
+
+function probeWispEndpoint(endpoint, timeoutMs = 5000) {
+	return new Promise((resolve, reject) => {
+		let socket;
+		let settled = false;
+		const timeout = window.setTimeout(() => {
+			finish(new Error("Connection check timed out."));
+		}, timeoutMs);
+		const finish = (error) => {
+			if (settled) return;
+			settled = true;
+			window.clearTimeout(timeout);
+			if (socket) {
+				socket.onopen = null;
+				socket.onerror = null;
+				socket.onclose = null;
+				socket.close();
+			}
+			if (error) reject(error);
+			else resolve(endpoint);
+		};
+		try {
+			const parsedEndpoint = new URL(endpoint);
+			if (
+				parsedEndpoint.protocol !== "wss:" ||
+				parsedEndpoint.username ||
+				parsedEndpoint.password
+			) {
+				throw new Error("Wisp endpoints must use secure WebSocket URLs.");
+			}
+			socket = new WebSocket(endpoint);
+			socket.onopen = () => finish();
+			socket.onerror = () => finish(new Error("WebSocket connection failed."));
+			socket.onclose = () =>
+				finish(new Error("WebSocket closed before connecting."));
+		} catch (error) {
+			finish(error);
+		}
+	});
+}
+
+async function checkTransportHealth() {
+	const status = document.getElementById("admin-status-transport");
+	const button = document.getElementById("check-transport");
+	button.disabled = true;
+	status.textContent = "Checking…";
+	status.dataset.state = "";
+	if (wispEndpoints.length === 0) {
+		button.disabled = false;
+		status.textContent = "Not configured";
+		status.dataset.state = "blocked";
+		throw new Error(
+			"No secure Wisp endpoints are configured in public/config.js."
+		);
+	}
+	const results = await Promise.allSettled(
+		wispEndpoints.map((endpoint) => probeWispEndpoint(endpoint))
+	);
+	button.disabled = false;
+	const healthy = results
+		.filter((result) => result.status === "fulfilled")
+		.map((result) => result.value);
+	status.textContent = healthy.length
+		? `${healthy.length} of ${wispEndpoints.length} online`
+		: "Unavailable";
+	status.dataset.state = healthy.length ? "active" : "blocked";
+	return healthy;
+}
+
+async function selectHealthyWispEndpoint() {
+	if (wispEndpoints.length === 0) {
+		throw new Error(
+			"No secure Wisp endpoints are configured in public/config.js."
+		);
+	}
+	const failures = [];
+	for (let offset = 0; offset < wispEndpoints.length; offset++) {
+		const index = (nextWispEndpointIndex + offset) % wispEndpoints.length;
+		const endpoint = wispEndpoints[index];
+		try {
+			await probeWispEndpoint(endpoint);
+			nextWispEndpointIndex = (index + 1) % wispEndpoints.length;
+			const status = document.getElementById("admin-status-transport");
+			status.textContent = `Online · ${new URL(endpoint).host}`;
+			status.dataset.state = "active";
+			return endpoint;
+		} catch (error) {
+			failures.push(`Endpoint ${index + 1}: ${error.message}`);
+		}
+	}
+	const error = new Error(
+		"No configured Wisp endpoint responded. Check the proxy service and try again."
+	);
+	error.cause = new Error(failures.join("\n"));
+	document.getElementById("admin-status-transport").textContent = "Unavailable";
+	document.getElementById("admin-status-transport").dataset.state = "blocked";
+	throw error;
 }
 
 function fetchWithTimeout(url, options, timeout, stage) {
@@ -1214,7 +1459,7 @@ async function prepareTransport() {
 				window.CLASSROOM_SCRAMJET_RUNTIME_READY,
 				"Scramjet assets"
 			);
-			const wispUrl = "wss://wisp-server-python-nh0a.onrender.com/";
+			const wispUrl = await selectHealthyWispEndpoint();
 			if (scramjetVersion === "v1") {
 				if (
 					typeof window.BareMux?.BareMuxConnection !== "function" ||
@@ -1366,8 +1611,9 @@ async function navigateTab(tab, url) {
 				});
 				showError(
 					"This page is taking too long to load.",
-					timeoutError.message,
-					getErrorLog(timeoutError)
+					"This can be caused by a slow destination or an unavailable proxy connection. Check the transport status before retrying.",
+					getErrorLog(timeoutError),
+					"Page load"
 				);
 			}
 		}, 30000);
@@ -1382,7 +1628,8 @@ async function navigateTab(tab, url) {
 		showError(
 			"Unable to open this page.",
 			err instanceof Error ? err.message : String(err),
-			getErrorLog(err)
+			getErrorLog(err),
+			classifySetupError(err)
 		);
 	}
 }
@@ -1648,6 +1895,25 @@ document
 	.getElementById("admin-close")
 	.addEventListener("click", () => adminDialog.close());
 document
+	.getElementById("shared-links-preview-close")
+	.addEventListener("click", () =>
+		document.getElementById("shared-links-preview-dialog").close()
+	);
+document
+	.getElementById("check-transport")
+	.addEventListener("click", async () => {
+		try {
+			const healthy = await checkTransportHealth();
+			showAdminMessage(
+				healthy.length
+					? `${healthy.length} of ${wispEndpoints.length} proxy endpoints are reachable.`
+					: "No proxy endpoints are reachable. Check the endpoint configuration and service."
+			);
+		} catch (error) {
+			showAdminMessage(error.message, true);
+		}
+	});
+document
 	.getElementById("admin-login-form")
 	.addEventListener("submit", async (event) => {
 		event.preventDefault();
@@ -1725,34 +1991,55 @@ document
 		document.getElementById("admin-announcement-form").requestSubmit();
 	});
 document
+	.getElementById("admin-shared-links")
+	.addEventListener("input", updateSharedLinksCount);
+document
+	.getElementById("preview-shared-links")
+	.addEventListener("click", () => {
+		try {
+			showSharedLinksPreview(getAdminSharedLinksInput());
+		} catch (error) {
+			showAdminMessage(error.message, true);
+		}
+	});
+document
+	.getElementById("shared-links-history")
+	.addEventListener("change", (event) => {
+		document.getElementById("restore-shared-links").disabled =
+			!Number.isInteger(Number(event.target.value)) ||
+			event.target.value === "" ||
+			!sharedLinksHistory[Number(event.target.value)];
+	});
+document
+	.getElementById("restore-shared-links")
+	.addEventListener("click", async () => {
+		const selected = Number(
+			document.getElementById("shared-links-history").value
+		);
+		const entry = sharedLinksHistory[selected];
+		if (!entry) return;
+		if (
+			!(await showConfirmation({
+				title: "Restore saved links?",
+				message:
+					"This replaces the current shared links. The current version will remain in history.",
+				confirmLabel: "Restore links",
+			}))
+		) {
+			return;
+		}
+		document.getElementById("admin-shared-links").value = entry.links
+			.map((link) => `${link.label} | ${link.url}`)
+			.join("\n");
+		updateSharedLinksCount();
+		document.getElementById("admin-links-form").requestSubmit();
+	});
+document
 	.getElementById("admin-links-form")
 	.addEventListener("submit", async (event) => {
 		event.preventDefault();
-		const lines = document
-			.getElementById("admin-shared-links")
-			.value.split(/\r?\n/)
-			.map((line) => line.trim())
-			.filter(Boolean);
-		if (lines.length > 8) {
-			showAdminMessage("You can add up to 8 shared quick links.", true);
-			return;
-		}
-		const links = [];
-		for (const line of lines) {
-			const separator = line.indexOf("|");
-			if (separator < 1) {
-				showAdminMessage(
-					"Use one link per line in the format: Label | https://example.com",
-					true
-				);
-				return;
-			}
-			links.push({
-				label: line.slice(0, separator).trim(),
-				url: line.slice(separator + 1).trim(),
-			});
-		}
 		try {
+			const links = getAdminSharedLinksInput();
 			await adminRequest("/api/admin/links", {
 				method: "POST",
 				body: JSON.stringify({ links }),
@@ -1807,6 +2094,9 @@ quickLinks.addEventListener("click", (event) => {
 	event.preventDefault();
 	navigateTab(activeTab(), link.dataset.url);
 });
+document
+	.getElementById("quick-links-filter")
+	.addEventListener("input", filterQuickLinks);
 
 document.addEventListener("keydown", (event) => {
 	const key = typeof event.key === "string" ? event.key : "";
@@ -1832,6 +2122,13 @@ document.addEventListener("keydown", (event) => {
 		event.preventDefault();
 		address.focus();
 		address.select();
+	} else if (modifier && key.toLowerCase() === "k") {
+		event.preventDefault();
+		if (activeTab()?.home) homeAddress.focus();
+		else {
+			address.focus();
+			address.select();
+		}
 	} else if (modifier && ["r", "f5"].includes(key.toLowerCase())) {
 		event.preventDefault();
 		activeTab()?.frame?.reload();

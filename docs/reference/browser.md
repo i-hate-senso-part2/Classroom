@@ -8,6 +8,7 @@ The UI is a single static page served from `public/`. Browser features are imple
 - Google, DuckDuckGo, and Brave search templates are available.
 - Tabs have independent navigation history; use the toolbar or browser-style shortcuts to move backward, forward, reload, or return to the new-tab page.
 - Default quick links and saved bookmarks appear on the new-tab page. Bookmarks are saved in the current browser's local storage and do not sync to the server.
+- When there are more than six shortcuts, use the filter field to find a link by its label. `Ctrl+K` / `Cmd+K` focuses the new-tab search field (or the address bar when viewing a page).
 
 ## Preferences
 
@@ -25,6 +26,7 @@ The UI is a single static page served from `public/`. Browser features are imple
 | `Ctrl+T` / `Cmd+T`          | New tab                          |
 | `Ctrl+W` / `Cmd+W`          | Close current tab                |
 | `Ctrl+L` / `Cmd+L`          | Focus and select the address bar |
+| `Ctrl+K` / `Cmd+K`          | Focus the new-tab search/address |
 | `Ctrl+R` / `Cmd+R`, or `F5` | Reload current page              |
 | `Alt+Left`                  | Go back                          |
 | `Alt+Right`                 | Go forward                       |

@@ -7,9 +7,9 @@ Follow [local setup](../getting-started/local-setup.md). The package uses ES mod
 ## Day-to-day checks
 
 - `pnpm lint` runs ESLint against `src/`.
+- `pnpm test` builds the static runtime and runs Chromium smoke tests with Playwright. Install its browser once with `pnpm exec playwright install chromium`.
 - `pnpm format` runs Prettier across the repository; inspect the resulting diff because it can touch files beyond the code you intended to edit.
 - `pnpm build` prepares the Scramjet v2 runtime and isolated v1 bundle under `public/`.
-- There is no package test script at present.
 
 ## Change map
 
@@ -24,4 +24,4 @@ When changing runtime behavior, update the corresponding reference page under `d
 
 ## Dependency workflow note
 
-The project declares pnpm and tracks `pnpm-lock.yaml`, while the current Dockerfile uses npm and `package-lock.json`. Check both workflows when changing dependency versions.
+The project declares pnpm and tracks both `pnpm-lock.yaml` and `package-lock.json`, while the current Dockerfile uses npm. Keep both lockfiles aligned when changing dependency versions.

@@ -20,4 +20,4 @@ The local Node server also hosts `@mercuryworkshop/wisp-js/server` at `/wisp/` f
 
 ## Configuration boundary
 
-`public/config.js` currently is not loaded by `public/index.html`, and the active transport URL is assembled directly in `public/index.js`. Therefore the endpoint array in `public/config.js` is not currently a switch for the active transport. See [configuration](../getting-started/configuration.md).
+`public/config.js` is loaded by `public/index.html`; its `wispEndpoints` array is the active endpoint list. Before first proxy use, the browser checks each secure WebSocket endpoint in order and selects the first reachable one. The admin panel's connection check reports endpoint reachability from the current browser. Configure a second trusted Wisp service in this array to enable failover; the project does not invent or ship an unverified backup endpoint. A successful WebSocket check only confirms that the endpoint accepts connections, not that every destination works.

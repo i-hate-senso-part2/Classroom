@@ -1,7 +1,9 @@
 (function configureScramjetApp(window) {
-  const publicWispEndpoints = Object.freeze([
-	"wss://wisp-server-python-nh0a.onrender.com/",
-]);
+	// Add only Wisp endpoints you control or trust; the browser selects the first
+	// reachable endpoint and continues through this list if a connection fails.
+	const publicWispEndpoints = Object.freeze([
+		"wss://wisp-server-python-nh0a.onrender.com/",
+	]);
 
 	let endpointCursor = -1;
 

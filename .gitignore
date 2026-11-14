@@ -3,6 +3,8 @@ node_modules
 scramjet/
 /public/scram-v1/
 data/
+playwright-report/
+test-results/
 .env
 .env.*
 !.env.example

@@ -344,11 +344,30 @@
 								<h2>Quick links</h2>
 								<span>YOUR SHORTCUTS</span>
 							</div>
+							<label
+								id="quick-links-filter-label"
+								class="quick-links-filter"
+								hidden
+							>
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<circle cx="10.8" cy="10.8" r="6.3" />
+									<path d="m15.5 15.5 4 4" />
+								</svg>
+								<input
+									id="quick-links-filter"
+									type="search"
+									placeholder="Filter your shortcuts"
+									aria-label="Filter quick links"
+								/>
+							</label>
 							<div
 								id="quick-links"
 								class="quick-links"
 								aria-label="Bookmarks and shortcuts"
 							></div>
+							<p id="quick-links-empty" class="quick-links-empty" hidden>
+								No shortcuts match that search.
+							</p>
 						</section>
 					</div>
 					<footer class="home-footer">
@@ -365,7 +384,8 @@
 						<span class="status-icon" aria-hidden="true">!</span>
 						<div class="status-copy">
 							<span class="status-kicker"
-								>SCRAMJET <span id="sj-error-version"></span
+								><span id="sj-error-source">Classroom</span>
+								<span id="sj-error-version"></span
 							></span>
 							<p id="sj-error"></p>
 						</div>
@@ -454,7 +474,26 @@
 						<span>State store</span>
 						<strong id="admin-status-store">Checking</strong>
 					</div>
+					<div class="admin-status-card">
+						<span>Transport</span>
+						<strong id="admin-status-transport">Not checked</strong>
+					</div>
 				</div>
+				<details class="admin-section">
+					<summary class="admin-section-heading">
+						<div><h3>Connection check</h3></div>
+						<p>Test the proxy transport.</p>
+					</summary>
+					<p class="admin-help">
+						Checks configured Wisp endpoints from this browser. A healthy
+						connection does not guarantee that every destination is available.
+					</p>
+					<div class="admin-actions">
+						<button id="check-transport" class="dialog-secondary" type="button">
+							Check connection
+						</button>
+					</div>
+				</details>
 				<details class="admin-section" aria-labelledby="access-heading" open>
 					<summary class="admin-section-heading">
 						<div>
@@ -567,10 +606,34 @@
 							placeholder="School portal | https://school.example"
 							spellcheck="false"
 						></textarea>
+						<p id="shared-links-count" class="admin-help" aria-live="polite">
+							0 of 8 links
+						</p>
 						<div class="admin-actions">
+							<button
+								id="preview-shared-links"
+								class="dialog-secondary"
+								type="button"
+							>
+								Preview homepage
+							</button>
 							<button class="dialog-primary" type="submit">Save links</button>
 						</div>
 					</form>
+					<div class="admin-field">
+						<label for="shared-links-history">Recent saved versions</label>
+						<select id="shared-links-history">
+							<option value="">No saved changes yet</option>
+						</select>
+						<button
+							id="restore-shared-links"
+							class="dialog-secondary"
+							type="button"
+							disabled
+						>
+							Restore selected version
+						</button>
+					</div>
 				</details>
 				<section
 					class="admin-section admin-section-actions"
@@ -585,6 +648,31 @@
 				</section>
 			</section>
 			<p id="admin-message" class="dialog-message" aria-live="polite"></p>
+		</dialog>
+		<dialog
+			id="shared-links-preview-dialog"
+			class="utility-dialog"
+			aria-labelledby="shared-links-preview-title"
+		>
+			<div class="dialog-heading">
+				<div>
+					<span class="dialog-kicker">HOMEPAGE PREVIEW</span>
+					<h2 id="shared-links-preview-title">Shared quick links</h2>
+				</div>
+				<button
+					id="shared-links-preview-close"
+					class="icon-button"
+					type="button"
+					aria-label="Close homepage preview"
+					title="Close"
+				>
+					<svg viewBox="0 0 24 24" aria-hidden="true">
+						<path d="m6 6 12 12M18 6 6 18" />
+					</svg>
+				</button>
+			</div>
+			<p id="shared-links-preview-summary" class="admin-help"></p>
+			<ul id="shared-links-preview" class="shared-links-preview"></ul>
 		</dialog>
 		<dialog
 			id="announcement-dialog"

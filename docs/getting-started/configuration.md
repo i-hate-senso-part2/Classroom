@@ -23,4 +23,6 @@ Without KV settings, local runs store the `blocked` setting in `data/browser-sta
 
 Browser theme and bookmarks are stored in the visitor's local storage. Quick links, search-engine definitions, and tab appearance presets are defined in `public/index.js`; their image paths point into `public/logos/` or to `/sj.png`.
 
-`public/config.js` defines a `SCRAMJET_APP_CONFIG` object and is loaded by `public/index.html`, but the browser runtime does not consume that object. The active browser transport connects directly to `wss://wisp-server-python-nh0a.onrender.com/` in `public/index.js`. Changing the unused config object's endpoint list alone does not change the active transport.
+`public/config.js` defines `SCRAMJET_APP_CONFIG`, including the active `wispEndpoints` array. The browser checks the configured secure WebSocket endpoints before setting up the transport and tries subsequent entries when an endpoint is unreachable. Add only endpoints you control or trust. The admin panel can test reachability from a visitor's browser; reachability does not guarantee that a destination site will respond.
+
+For isolated tests, `BROWSER_STATE_PATH` can point the local server at a separate state file instead of the default `data/browser-state.json`.

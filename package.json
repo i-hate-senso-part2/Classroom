@@ -10,6 +10,8 @@
 	"scripts": {
 		"build": "node scripts/prepare-static-assets.js",
 		"start": "npm run build && node src/index.js",
+		"test": "node scripts/prepare-static-assets.js && playwright test",
+		"test:browser": "playwright test",
 		"hash-admin-password": "node scripts/hash-admin-password.js",
 		"format": "prettier --write .",
 		"lint": "eslint ./src/",
@@ -31,6 +33,7 @@
 		"ws": "^8.18.3"
 	},
 	"devDependencies": {
+		"@playwright/test": "^1.65.1",
 		"eslint": "^9.13.0",
 		"prettier": "^3.3.3"
 	},

@@ -24,7 +24,7 @@ The admin panel can enable the public blocked screen, allow authenticated admins
 
 Admins can post or clear a 500-character announcement popup, choose whether visitors can close it, set a per-visitor auto-close timer, and optionally set a global expiration time. A preview is local to the admin session. Visitors see each announcement once until it is changed; authenticated admins do not see published popups.
 
-Up to eight shared homepage links can be managed as `Label | https://example.com` lines. Only HTTP(S) URLs without embedded credentials are accepted. Changes are shared across visitors.
+Up to eight shared homepage links can be managed as `Label | https://example.com` lines. Only HTTP(S) URLs without embedded credentials are accepted. Preview the visitor-facing shortcuts before saving. The last ten changed versions are kept in shared state and can be restored; restoring creates a new history entry. Re-saving identical links does not create a duplicate entry.
 
 The admin panel's "Refresh everyone else" action sends a shared refresh signal. Open pages poll the setting every 10 seconds, check whether they are blocked, and reload only if access is allowed. The admin page that sent the signal is excluded.
 
