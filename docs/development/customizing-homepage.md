@@ -12,7 +12,9 @@ Edit the `#home-screen` section in `public/index.html`. Keep the `home-search-fo
 
 ## Change built-in shortcuts
 
-Edit the `defaultLinks` array near the top of `public/index.js`. Each entry has a `label`, `url`, and optional `logo` path. Shortcut buttons are created by `renderQuickLinks()`; do not add generated button markup to the HTML because the list is rebuilt when browser state changes.
+Edit the `defaultLinks` array near the top of `public/index.js`. Each entry has a `label`, `url`, and optional `logo` path. Shortcuts are created by `renderQuickLinks()`; do not add generated button markup to the HTML because the list is rebuilt when browser state changes.
+
+All quick links open through the proxy. TikTok and GeForce NOW are recommended on SE (V1.1.0); choosing the V1 switch in their V2 compatibility notice now resumes the requested page through the proxy after reloading.
 
 Visitor bookmarks are stored in that visitor's browser. Shared links are managed from the administrator panel and stored in shared browser state; those values are appended to built-ins and bookmarks. Duplicate URLs are only shown once. See [Administrator and browser state](../operations/admin-state.md) for shared-link limits and validation.
 
@@ -22,4 +24,4 @@ Update the `.home-*` and `.quick-link` rules in `public/browser.css`. The theme 
 
 ## Verify
 
-Run `pnpm lint` for the server and `node --check public/index.js` for browser-script syntax. Then run `pnpm start` and check a new tab at desktop and mobile widths. The project does not currently have an automated browser test suite.
+Run `pnpm lint` for the server, `node --check public/index.js` for browser-script syntax, and `pnpm test:browser` for the browser tests. Then run `pnpm start` and check a new tab at desktop and mobile widths.

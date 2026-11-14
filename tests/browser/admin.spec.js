@@ -68,6 +68,68 @@ test.afterAll(async () => {
 	if (dataDirectory) rmSync(dataDirectory, { recursive: true, force: true });
 });
 
+test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
+	page,
+}) => {
+	await page.goto(baseUrl);
+
+	for (const [label, url] of [
+		["GeForce NOW", "https://play.geforcenow.com/"],
+		["TikTok", "https://www.tiktok.com/"],
+	]) {
+		const link = page.getByRole("button", { name: `Open ${label}` });
+		await expect(link).toHaveAttribute("data-url", url);
+	}
+});
+
+test("compatibility switch preserves the proxied destination on V1.1.0", async ({
+	page,
+}) => {
+	await page.route("**/config.js", (route) =>
+		route.fulfill({
+			contentType: "application/javascript",
+			body: `window.SCRAMJET_APP_CONFIG = Object.freeze({
+				wispEndpoints: Object.freeze(["wss://primary.test/"])
+			});`,
+		})
+	);
+	await page.addInitScript(() => {
+		if (!localStorage.getItem("classroom-scramjet-version")) {
+			localStorage.setItem("classroom-scramjet-version", "v2");
+		}
+		window.WebSocket = class {
+			constructor() {
+				setTimeout(() => this.onopen?.(new Event("open")), 0);
+			}
+			close() {}
+		};
+	});
+
+	await page.goto(baseUrl);
+	await page.locator("#home-address").fill("https://www.tiktok.com/");
+	await page
+		.locator("#home-search-form")
+		.evaluate((form) => form.requestSubmit());
+	await expect(page.locator("#compatibility-dialog")).toBeVisible();
+
+	const reload = page.waitForNavigation();
+	await page
+		.getByRole("button", { name: "Switch to SE (V1.1.0)" })
+		.click();
+	await reload;
+
+	await expect(page.locator("#scramjet-version-label")).toHaveText(
+		"SE (V1.1.0)"
+	);
+	await expect(page.locator("#sj-address")).toHaveValue(
+		"https://www.tiktok.com/"
+	);
+	await expect(page.locator(".page-frame")).toHaveAttribute(
+		"src",
+		/^\/~1\//
+	);
+});
+
 test("admin preview, save, restore, and homepage reflect shared links", async ({
 	page,
 }) => {

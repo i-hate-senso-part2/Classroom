@@ -34,6 +34,8 @@ const versionPickerMenu = document.getElementById("scramjet-version-menu");
 const compatibilityDialog = document.getElementById("compatibility-dialog");
 const compatibilityTitle = document.getElementById("compatibility-title");
 const compatibilityMessage = document.getElementById("compatibility-message");
+const pendingCompatibilityNavigationKey =
+	"classroom-pending-compatibility-navigation";
 const confirmationDialog = document.getElementById("confirmation-dialog");
 const confirmationTitle = document.getElementById("confirmation-title");
 const confirmationMessage = document.getElementById("confirmation-message");
@@ -260,11 +262,22 @@ function closeVersionPicker(returnFocus = false) {
 	if (returnFocus) versionPickerTrigger.focus();
 }
 
-function selectScramjetVersion(nextVersion) {
+function selectScramjetVersion(nextVersion, urlToOpen = "") {
 	if (!Object.hasOwn(versionLabels, nextVersion)) return;
 	try {
+		if (urlToOpen) {
+			sessionStorage.setItem(pendingCompatibilityNavigationKey, urlToOpen);
+		}
 		localStorage.setItem("classroom-scramjet-version", nextVersion);
 	} catch (err) {
+		try {
+			sessionStorage.removeItem(pendingCompatibilityNavigationKey);
+		} catch (cleanupError) {
+			console.error(
+				"[Classroom] Unable to clear a pending compatibility navigation.",
+				cleanupError
+			);
+		}
 		closeVersionPicker();
 		showError(
 			"Unable to save the Scramjet version.",
@@ -327,7 +340,9 @@ versionPickerMenu.addEventListener("keydown", (event) => {
 });
 document
 	.getElementById("compatibility-switch")
-	.addEventListener("click", () => selectScramjetVersion("v1"));
+	.addEventListener("click", () =>
+		selectScramjetVersion("v1", activeTab()?.url)
+	);
 document
 	.getElementById("compatibility-continue")
 	.addEventListener("click", () => compatibilityDialog.close());
@@ -1131,6 +1146,10 @@ function classifySetupError(error) {
 
 function getV2IncompatibleSite(url) {
 	if (scramjetVersion !== "v2") return null;
+	return getV1RecommendedSite(url);
+}
+
+function getV1RecommendedSite(url) {
 	let hostname;
 	try {
 		hostname = new URL(url).hostname.toLowerCase();
@@ -2156,6 +2175,22 @@ async function finishStartup() {
 		return;
 	}
 	startupScreen.hidden = true;
+	let pendingUrl;
+	try {
+		pendingUrl = sessionStorage.getItem(pendingCompatibilityNavigationKey);
+		if (pendingUrl) {
+			sessionStorage.removeItem(pendingCompatibilityNavigationKey);
+		}
+	} catch (err) {
+		showError(
+			"Unable to restore the requested page.",
+			err instanceof Error ? err.message : String(err)
+		);
+		return;
+	}
+	if (pendingUrl && getV1RecommendedSite(pendingUrl)) {
+		void navigateTab(activeTab(), pendingUrl);
+	}
 }
 
 finishStartup();
