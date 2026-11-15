@@ -16,7 +16,7 @@ The UI is a single static page served from `public/`. Browser features are imple
 - Bookmarks are saved as `classroom-bookmarks` in local storage.
 - User settings preview changes before saving; closing without saving restores the last saved preferences. Reset restores the default dark palette and appearance.
 - The fullscreen control hides browser chrome; use its floating exit button or press `Escape` to leave fullscreen.
-- The saved default tab appearance updates open and future tabs' visible title and icon only. It does not alter network requests or conceal activity from the server/device administrator.
+- The saved default tab appearance changes only the outer Classroom page's browser-tab title and icon. Classroom's internal tabs continue to show their page titles, and proxy iframe titles are unchanged. This does not alter network requests or conceal activity from the server/device administrator.
 - The admin panel opens after the Up, Down, Up, Down arrow sequence, or through the admin control.
 
 ## Keyboard shortcuts

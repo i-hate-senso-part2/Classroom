@@ -82,6 +82,23 @@ test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
 	}
 });
 
+test("tab appearance cloaks only the outer Classroom tab", async ({ page }) => {
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "User settings" }).click();
+	await page.locator("#default-cloak-select").selectOption("google");
+
+	await expect(page).toHaveTitle("Google");
+	await expect(page.locator("#tab-list .tab-title")).toHaveText("New tab");
+	await expect(page.locator("#tab-list .tab-favicon img")).toHaveAttribute(
+		"src",
+		"/sj.png"
+	);
+	await expect(page.locator("#browser-favicon")).toHaveAttribute(
+		"href",
+		"/logos/google-circle.webp"
+	);
+});
+
 test("compatibility switch preserves the proxied destination on V1.1.0", async ({
 	page,
 }) => {
@@ -94,6 +111,10 @@ test("compatibility switch preserves the proxied destination on V1.1.0", async (
 		})
 	);
 	await page.addInitScript(() => {
+		localStorage.setItem(
+			"classroom-user-settings",
+			JSON.stringify({ defaultCloak: "google" })
+		);
 		if (!localStorage.getItem("classroom-scramjet-version")) {
 			localStorage.setItem("classroom-scramjet-version", "v2");
 		}
@@ -120,6 +141,12 @@ test("compatibility switch preserves the proxied destination on V1.1.0", async (
 
 	await expect(page.locator("#scramjet-version-label")).toHaveText(
 		"SE (V1.1.0)"
+	);
+	await expect(page).toHaveTitle("Google");
+	await expect(page.locator("#tab-list .tab-title")).toHaveText("tiktok.com");
+	await expect(page.locator(".page-frame")).toHaveAttribute(
+		"title",
+		"tiktok.com"
 	);
 	await expect(page.locator("#sj-address")).toHaveValue(
 		"https://www.tiktok.com/"
@@ -224,6 +251,9 @@ test("admin preview, save, restore, and homepage reflect shared links", async ({
 	await expect(page.locator("#admin-status-transport")).toHaveText(
 		"1 of 2 online"
 	);
+	await page.getByRole("button", { name: "Sign out" }).click();
+	await expect(page.locator("#admin-settings")).toBeHidden();
+	await expect(page.locator("#admin-login-form")).toBeVisible();
 	await page.locator("#admin-close").click();
 	await page.goto(baseUrl);
 	await expect(page.locator("#quick-links")).toContainText("School portal");
@@ -242,9 +272,6 @@ test("admin preview, save, restore, and homepage reflect shared links", async ({
 		.locator("#admin-dialog")
 		.evaluate((dialog) => dialog.getBoundingClientRect().width);
 	expect(dialogWidth).toBeLessThanOrEqual(390);
-	await page.getByRole("button", { name: "Sign out" }).click();
-	await expect(page.locator("#admin-settings")).toBeHidden();
-	await expect(page.locator("#admin-login-form")).toBeVisible();
 });
 
 test("unreachable primary Wisp endpoint falls back to the next configured endpoint", async ({

@@ -89,14 +89,14 @@ const menu = document.querySelector(".engine-menu");
 const tabs = [];
 const defaultLinks = [
 	{
-		label: "Google",
-		url: "https://www.google.com/",
-		logo: "/logos/google.webp",
+		label: "Chess",
+		url: "https://www.chess.com/",
+		logo: "/logos/chess.png",
 	},
 	{
-		label: "YouTube",
-		url: "https://www.youtube.com/",
-		logo: "/logos/youtube.webp",
+		label: "Minecraft",
+		url: "https://eaglercraft.com/play",
+		logo: "/logos/minecraft.webp",
 	},
 	{
 		label: "GeForce NOW",
@@ -111,10 +111,10 @@ const defaultLinks = [
 ];
 const cloakTemplates = [
 	{ id: "normal", title: "", logo: "/sj.png" },
-	{ id: "google", title: "Google", logo: "/logos/google.webp" },
-	{ id: "youtube", title: "YouTube", logo: "/logos/youtube.webp" },
-	{ id: "geforce", title: "Google Classroom", logo: "/logos/classroom.png" },
-	{ id: "tiktok", title: "TikTok", logo: "/logos/tiktok.png" },
+	{ id: "kahoot", title: "Enter Game PIN - Kahoot!", logo: "/logos/kahoot.webp" },
+	{ id: "google", title: "Google", logo: "/logos/google-circle.webp" },
+	{ id: "classroom", title: "Home - Classroom", logo: "/logos/classroom.png" },
+	{ id: "wikipedia", title: "Wikipedia", logo: "/logos/wikipedia.webp" },
 ];
 const DEFAULT_USER_SETTINGS = Object.freeze({
 	theme: "moss",
@@ -386,10 +386,10 @@ function renderTabs() {
 		select.className = "tab-select";
 		select.setAttribute("role", "tab");
 		select.setAttribute("aria-selected", String(tab.id === activeTabId));
-		const template = cloakTemplates.find((item) => item.id === tab.cloak);
-		const displayTitle = template?.title || tab.title;
+		const displayTitle = tab.title;
 		select.title = displayTitle;
-		select.innerHTML = `<span class="tab-favicon" aria-hidden="true"><img src="${template?.logo || "/sj.png"}" alt="" /></span>`;
+		select.innerHTML =
+			'<span class="tab-favicon" aria-hidden="true"><img src="/sj.png" alt="" /></span>';
 		const title = document.createElement("span");
 		title.className = "tab-title";
 		title.textContent = displayTitle;
@@ -431,7 +431,7 @@ function syncBrowser() {
 	const cloak = cloakTemplates.find((item) => item.id === tab.cloak);
 	document.title = cloak?.title || (tab.home ? "New tab" : tab.title);
 	document.getElementById("browser-favicon").href = cloak?.logo || "/sj.png";
-	if (tab.frame) tab.frame.element.title = cloak?.title || tab.title;
+	if (tab.frame) tab.frame.element.title = tab.title;
 	renderTabs();
 }
 
