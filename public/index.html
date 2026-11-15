@@ -307,6 +307,16 @@
 
 			<main id="browser-stage" class="browser-stage">
 				<section id="home-screen" class="home-screen" aria-label="New tab">
+					<video
+						id="home-background-video"
+						class="home-background-video"
+						muted
+						loop
+						autoplay
+						playsinline
+						aria-hidden="true"
+						hidden
+					></video>
 					<div class="home-content">
 						<section class="home-lead" aria-label="Start browsing">
 							<div class="home-brand">
@@ -774,82 +784,89 @@
 				</button>
 			</div>
 			<form id="user-settings-form">
-				<select id="theme-select" hidden>
-					<option value="moss">Fern</option>
-					<option value="midnight">Slate</option>
-					<option value="sunset">Ember</option>
-					<option value="ocean">Tide</option>
-				</select>
-				<fieldset class="theme-picker">
-					<legend>Theme</legend>
-					<div class="theme-options">
-						<label class="theme-option">
-							<input type="radio" name="theme-option" value="moss" />
-							<span
-								class="theme-swatch theme-swatch-moss"
-								aria-hidden="true"
-							></span>
-							<span>Fern</span>
-						</label>
-						<label class="theme-option">
-							<input type="radio" name="theme-option" value="midnight" />
-							<span
-								class="theme-swatch theme-swatch-midnight"
-								aria-hidden="true"
-							></span>
-							<span>Slate</span>
-						</label>
-						<label class="theme-option">
-							<input type="radio" name="theme-option" value="sunset" />
-							<span
-								class="theme-swatch theme-swatch-sunset"
-								aria-hidden="true"
-							></span>
-							<span>Ember</span>
-						</label>
-						<label class="theme-option">
-							<input type="radio" name="theme-option" value="ocean" />
-							<span
-								class="theme-swatch theme-swatch-ocean"
-								aria-hidden="true"
-							></span>
-							<span>Tide</span>
-						</label>
-					</div>
+				<p id="theme-onboarding-message" class="dialog-message" hidden>
+					Create and save a custom theme to start using Classroom.
+				</p>
+				<label for="theme-name">Theme name</label>
+				<input
+					id="theme-name"
+					type="text"
+					maxlength="40"
+					autocomplete="off"
+					required
+				/>
+				<fieldset class="theme-colors">
+					<legend>Theme colors</legend>
+					<label for="theme-color-background">Page background</label>
+					<input id="theme-color-background" type="color" value="#0c100e" />
+					<label for="theme-color-surface">Panels and surfaces</label>
+					<input id="theme-color-surface" type="color" value="#151a17" />
+					<label for="theme-color-text">Text</label>
+					<input id="theme-color-text" type="color" value="#e8eee8" />
+					<label for="theme-color-accent">Accent</label>
+					<input id="theme-color-accent" type="color" value="#c4e879" />
 				</fieldset>
-				<label for="background-select">Home background</label>
-				<select id="background-select">
-					<option value="grid">Fine grid</option>
-					<option value="lines">Diagonal lines</option>
-					<option value="plain">Clean</option>
+				<label for="background-type">Home background</label>
+				<select id="background-type">
+					<option value="color">Theme color</option>
 					<option value="image">Custom image</option>
+					<option value="video">Custom video</option>
 				</select>
-				<label for="background-image-file">Background image</label>
-				<div class="file-picker">
+				<div id="background-image-controls" hidden>
+					<label for="background-image-file">Background image</label>
+					<div class="file-picker">
+						<input
+							id="background-image-file"
+							class="file-picker-input"
+							type="file"
+							accept="image/png,image/jpeg,image/webp,image/gif"
+						/>
+						<label class="file-picker-button" for="background-image-file"
+							>Choose image</label
+						>
+						<span id="background-image-name" class="file-picker-name"
+							>No image selected</span
+						>
+					</div>
+					<div class="background-image-preview-row">
+						<img id="background-image-preview" alt="" hidden />
+					</div>
+				</div>
+				<div id="background-video-controls" hidden>
+					<label for="background-video-file">Video background</label>
+					<div class="file-picker">
+						<input
+							id="background-video-file"
+							class="file-picker-input"
+							type="file"
+							accept="video/mp4,video/webm"
+						/>
+						<label class="file-picker-button" for="background-video-file"
+							>Choose video</label
+						>
+						<span id="background-video-name" class="file-picker-name"
+							>No video selected</span
+						>
+					</div>
+					<label for="background-video-url">Or paste a direct MP4/WebM URL</label>
 					<input
-						id="background-image-file"
-						class="file-picker-input"
-						type="file"
-						accept="image/png,image/jpeg,image/webp,image/gif"
+						id="background-video-url"
+						type="url"
+						placeholder="https://example.com/background.mp4"
 					/>
-					<label class="file-picker-button" for="background-image-file"
-						>Choose image</label
-					>
-					<span id="background-image-name" class="file-picker-name"
-						>No image selected</span
-					>
+					<small class="theme-help">
+						Videos play muted and loop. Uploaded videos up to 50 MB stay in
+						this browser.
+					</small>
 				</div>
-				<div class="background-image-preview-row">
-					<img id="background-image-preview" alt="" hidden />
-					<button
-						id="remove-background-image"
-						class="dialog-secondary"
-						type="button"
-						hidden
-					>
-						Remove image
-					</button>
-				</div>
+				<button
+					id="background-media-remove"
+					class="dialog-secondary"
+					type="button"
+					hidden
+				>
+					Remove background media
+				</button>
 				<label for="default-cloak-select">Default tab appearance</label>
 				<select id="default-cloak-select">
 					<option value="normal">Original</option>
@@ -859,14 +876,9 @@
 					<option value="tiktok">TikTok</option>
 				</select>
 				<div class="settings-actions">
-					<button
-						id="user-settings-reset"
-						class="dialog-secondary"
-						type="button"
-					>
-						Reset
+					<button id="theme-save" class="dialog-primary" type="submit">
+						Save theme
 					</button>
-					<button class="dialog-primary" type="submit">Save settings</button>
 				</div>
 				<p
 					id="user-settings-message"

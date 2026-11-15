@@ -116,17 +116,41 @@ const cloakTemplates = [
 	{ id: "classroom", title: "Home - Classroom", logo: "/logos/classroom.png" },
 	{ id: "wikipedia", title: "Wikipedia", logo: "/logos/wikipedia.webp" },
 ];
-const DEFAULT_USER_SETTINGS = Object.freeze({
-	theme: "moss",
-	background: "grid",
-	defaultCloak: "normal",
-	backgroundImage: "",
-});
-const BUILT_IN_THEMES = new Set(["moss", "sunset", "ocean", "midnight"]);
-const HOME_BACKGROUNDS = new Set(["grid", "lines", "plain", "image"]);
 const CLOAK_NAMES = new Set(cloakTemplates.map((template) => template.id));
 const IMAGE_DATA_URL =
 	/^data:image\/(?:png|jpeg|webp|gif);base64,[\da-z+/]+=*$/i;
+const THEME_COLORS = Object.freeze({
+	background: "#0c100e",
+	surface: "#151a17",
+	text: "#e8eee8",
+	accent: "#c4e879",
+});
+const THEME_COLOR_KEYS = Object.keys(THEME_COLORS);
+const VIDEO_BACKGROUND_MAX_BYTES = 50 * 1024 * 1024;
+const THEME_ASSET_DB_NAME = "classroom-theme-assets";
+const THEME_ASSET_STORE = "videos";
+const LEGACY_THEME_COLORS = {
+	moss: THEME_COLORS,
+	midnight: {
+		background: "#0c1016",
+		surface: "#151b24",
+		text: "#e8edf5",
+		accent: "#9ac5ff",
+	},
+	sunset: {
+		...THEME_COLORS,
+		accent: "#ff967b",
+	},
+	ocean: {
+		...THEME_COLORS,
+		accent: "#69d6cb",
+	},
+};
+let hasUserTheme = false;
+let savedVideoObjectUrl = "";
+let previewVideoFile = null;
+let previewVideoObjectUrl = "";
+let backgroundVideoError = "";
 let activeTabId = null;
 let tabSequence = 0;
 let controller;
@@ -151,35 +175,141 @@ try {
 	bookmarks = [];
 }
 
+function defaultUserSettings() {
+	return {
+		theme: {
+			name: "",
+			colors: { ...THEME_COLORS },
+			backgroundType: "color",
+			backgroundImage: "",
+			backgroundVideoUrl: "",
+			backgroundVideoId: "",
+			backgroundVideoStored: false,
+		},
+		defaultCloak: "normal",
+	};
+}
+
+function isThemeColor(value) {
+	return typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
+}
+
+function safeMediaUrl(value) {
+	if (typeof value !== "string" || !value.trim()) return "";
+	try {
+		const url = new URL(value.trim(), location.href);
+		if (!["http:", "https:"].includes(url.protocol)) return "";
+		if (url.username || url.password) return "";
+		if (location.protocol === "https:" && url.protocol !== "https:") return "";
+		return url.href;
+	} catch {
+		return "";
+	}
+}
+
 function loadUserSettings() {
 	try {
-		const stored = JSON.parse(
-			localStorage.getItem("classroom-user-settings") || "null"
-		);
-		if (stored && typeof stored === "object") {
+		const raw = localStorage.getItem("classroom-user-settings");
+		if (raw === null) {
+			const legacyTheme = localStorage.getItem("classroom-theme");
+			if (legacyTheme) {
+				hasUserTheme = true;
+				const legacyThemeName =
+					legacyTheme === "dark" ? "midnight" : legacyTheme;
+				return {
+					...defaultUserSettings(),
+					theme: {
+						...defaultUserSettings().theme,
+						name: "My theme",
+						colors: {
+							...(LEGACY_THEME_COLORS[legacyThemeName] || THEME_COLORS),
+						},
+					},
+				};
+			}
+			return defaultUserSettings();
+		}
+		const stored = JSON.parse(raw);
+		if (stored && typeof stored === "object" && stored.theme) {
+			hasUserTheme = true;
+			if (typeof stored.theme === "object") {
+				const theme = stored.theme;
+				const colors = Object.fromEntries(
+					THEME_COLOR_KEYS.map((key) => [
+						key,
+						isThemeColor(theme.colors?.[key])
+							? theme.colors[key]
+							: THEME_COLORS[key],
+					])
+				);
+				const backgroundImage =
+					typeof theme.backgroundImage === "string" &&
+					IMAGE_DATA_URL.test(theme.backgroundImage)
+						? theme.backgroundImage
+						: "";
+				const backgroundVideoUrl = safeMediaUrl(theme.backgroundVideoUrl);
+				const backgroundVideoId =
+					typeof theme.backgroundVideoId === "string" &&
+					/^[\w-]{1,100}$/.test(theme.backgroundVideoId)
+						? theme.backgroundVideoId
+						: "";
+				const backgroundVideoStored =
+					theme.backgroundVideoStored === true && Boolean(backgroundVideoId);
+				const backgroundType = ["color", "image", "video"].includes(
+					theme.backgroundType
+				)
+					? theme.backgroundType
+					: "color";
+				return {
+					theme: {
+						name:
+							typeof theme.name === "string"
+								? theme.name.trim().slice(0, 40)
+								: "My theme",
+						colors,
+						backgroundType:
+							(backgroundType === "image" && backgroundImage) ||
+							(backgroundType === "video" &&
+								(backgroundVideoUrl || backgroundVideoStored))
+								? backgroundType
+								: "color",
+						backgroundImage,
+						backgroundVideoUrl,
+						backgroundVideoId,
+						backgroundVideoStored,
+					},
+					defaultCloak: CLOAK_NAMES.has(stored.defaultCloak)
+						? stored.defaultCloak
+						: "normal",
+				};
+			}
+			const themeColors =
+				LEGACY_THEME_COLORS[stored.theme] || THEME_COLORS;
+			const legacyImage =
+				typeof stored.backgroundImage === "string" &&
+				IMAGE_DATA_URL.test(stored.backgroundImage)
+					? stored.backgroundImage
+					: "";
 			return {
-				theme: BUILT_IN_THEMES.has(stored.theme) ? stored.theme : "moss",
-				background: HOME_BACKGROUNDS.has(stored.background)
-					? stored.background
-					: "grid",
+				theme: {
+					name: "My theme",
+					colors: { ...themeColors },
+					backgroundType:
+						stored.background === "image" && legacyImage ? "image" : "color",
+					backgroundImage: legacyImage,
+					backgroundVideoUrl: "",
+					backgroundVideoId: "",
+					backgroundVideoStored: false,
+				},
 				defaultCloak: CLOAK_NAMES.has(stored.defaultCloak)
 					? stored.defaultCloak
 					: "normal",
-				backgroundImage:
-					typeof stored.backgroundImage === "string" &&
-					IMAGE_DATA_URL.test(stored.backgroundImage)
-						? stored.backgroundImage
-						: "",
 			};
 		}
-		const previousTheme = localStorage.getItem("classroom-theme");
-		return {
-			...DEFAULT_USER_SETTINGS,
-			theme: previousTheme === "dark" ? "midnight" : "moss",
-		};
 	} catch {
-		return { ...DEFAULT_USER_SETTINGS };
+		hasUserTheme = false;
 	}
+	return defaultUserSettings();
 }
 
 let userSettings = loadUserSettings();
@@ -375,6 +505,104 @@ function activeTab() {
 	return tabs.find((tab) => tab.id === activeTabId);
 }
 
+function openThemeAssetDatabase() {
+	if (!window.indexedDB) {
+		return Promise.reject(new Error("Browser storage is unavailable."));
+	}
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(THEME_ASSET_DB_NAME, 1);
+		request.onupgradeneeded = () => {
+			request.result.createObjectStore(THEME_ASSET_STORE);
+		};
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () =>
+			reject(request.error || new Error("Theme storage could not be opened."));
+	});
+}
+
+async function writeThemeVideo(id, file) {
+	const database = await openThemeAssetDatabase();
+	try {
+		await new Promise((resolve, reject) => {
+			const transaction = database.transaction(THEME_ASSET_STORE, "readwrite");
+			transaction.objectStore(THEME_ASSET_STORE).put(file, id);
+			transaction.oncomplete = resolve;
+			transaction.onerror = () =>
+				reject(
+					transaction.error ||
+						new Error("The video background could not be saved.")
+				);
+			transaction.onabort = () =>
+				reject(
+					transaction.error ||
+						new Error("The video background could not be saved.")
+				);
+		});
+	} finally {
+		database.close();
+	}
+}
+
+async function readThemeVideo(id) {
+	const database = await openThemeAssetDatabase();
+	try {
+		return await new Promise((resolve, reject) => {
+			const transaction = database.transaction(THEME_ASSET_STORE, "readonly");
+			const request = transaction.objectStore(THEME_ASSET_STORE).get(id);
+			request.onsuccess = () => resolve(request.result || null);
+			request.onerror = () =>
+				reject(
+					request.error ||
+						new Error("The saved video background could not be read.")
+				);
+		});
+	} finally {
+		database.close();
+	}
+}
+
+async function deleteThemeVideo(id) {
+	if (!id) return;
+	const database = await openThemeAssetDatabase();
+	try {
+		await new Promise((resolve, reject) => {
+			const transaction = database.transaction(THEME_ASSET_STORE, "readwrite");
+			transaction.objectStore(THEME_ASSET_STORE).delete(id);
+			transaction.oncomplete = resolve;
+			transaction.onerror = () =>
+				reject(
+					transaction.error ||
+						new Error("The old video background could not be removed.")
+				);
+			transaction.onabort = () =>
+				reject(
+					transaction.error ||
+						new Error("The old video background could not be removed.")
+				);
+		});
+	} finally {
+		database.close();
+	}
+}
+
+async function restoreSavedThemeVideo() {
+	const id = userSettings.theme.backgroundVideoId;
+	if (!userSettings.theme.backgroundVideoStored || !id) return;
+	try {
+		const file = await readThemeVideo(id);
+		if (!file) throw new Error("The saved video background could not be found.");
+		if (userSettings.theme.backgroundVideoId !== id) return;
+		savedVideoObjectUrl = URL.createObjectURL(file);
+		backgroundVideoError = "";
+		applyUserSettings(settingsDraft || userSettings);
+	} catch (error) {
+		console.error("[Classroom] Unable to load the saved theme video.", error);
+		backgroundVideoError = error.message;
+		document.getElementById("user-settings-message").textContent =
+			backgroundVideoError;
+	}
+}
+
 function renderTabs() {
 	tabList.replaceChildren();
 	for (const tab of tabs) {
@@ -437,89 +665,217 @@ function syncBrowser() {
 
 function applyUserSettings(settings) {
 	const root = document.documentElement;
-	root.dataset.theme = settings.theme;
-	root.dataset.homeBackground = settings.background;
-	if (
-		settings.backgroundImage &&
-		IMAGE_DATA_URL.test(settings.backgroundImage)
-	) {
+	const theme = settings.theme;
+	root.dataset.theme = "custom";
+	root.dataset.homeBackground = theme.backgroundType;
+	root.style.setProperty("--custom-background", theme.colors.background);
+	root.style.setProperty("--custom-surface", theme.colors.surface);
+	root.style.setProperty("--custom-text", theme.colors.text);
+	root.style.setProperty("--custom-accent", theme.colors.accent);
+	if (theme.backgroundType === "image" && theme.backgroundImage) {
 		root.style.setProperty(
 			"--home-background-image",
-			`url("${settings.backgroundImage}")`
+			`url("${theme.backgroundImage}")`
 		);
 	} else {
 		root.style.removeProperty("--home-background-image");
+	}
+	const video = document.getElementById("home-background-video");
+	let videoSource = "";
+	if (theme.backgroundType === "video") {
+		if (theme.backgroundVideoFile) {
+			if (previewVideoFile !== theme.backgroundVideoFile) {
+				if (previewVideoObjectUrl)
+					URL.revokeObjectURL(previewVideoObjectUrl);
+				previewVideoFile = theme.backgroundVideoFile;
+				previewVideoObjectUrl = URL.createObjectURL(previewVideoFile);
+			}
+			videoSource = previewVideoObjectUrl;
+		} else if (theme.backgroundVideoStored) {
+			videoSource = savedVideoObjectUrl;
+		} else {
+			videoSource = safeMediaUrl(theme.backgroundVideoUrl);
+		}
+	}
+	video.hidden = !videoSource;
+	if (videoSource && video.dataset.source !== videoSource) {
+		backgroundVideoError = "";
+		video.dataset.source = videoSource;
+		video.src = videoSource;
+		video.load();
+	} else if (!videoSource && video.dataset.source) {
+		video.removeAttribute("src");
+		delete video.dataset.source;
+		video.load();
+		backgroundVideoError = "";
 	}
 	for (const tab of tabs) {
 		tab.cloak =
 			settings.defaultCloak === "normal" ? null : settings.defaultCloak;
 	}
 	if (tabs.length) syncBrowser();
-	document.getElementById("theme-select").value = settings.theme;
-	document.getElementById("background-select").value = settings.background;
 	document.getElementById("default-cloak-select").value = settings.defaultCloak;
 	const preview = document.getElementById("background-image-preview");
-	preview.hidden = !settings.backgroundImage;
-	preview.src = settings.backgroundImage || "";
-	document.getElementById("remove-background-image").hidden =
-		!settings.backgroundImage;
+	preview.hidden = theme.backgroundType !== "image" || !theme.backgroundImage;
+	preview.src = theme.backgroundImage || "";
 }
 
-function saveUserSettings() {
+function updateBackgroundControls(theme) {
+	document.getElementById("background-image-controls").hidden =
+		theme.backgroundType !== "image";
+	document.getElementById("background-video-controls").hidden =
+		theme.backgroundType !== "video";
+	document.getElementById("background-media-remove").hidden =
+		theme.backgroundType === "color" &&
+		!theme.backgroundImage &&
+		!theme.backgroundVideoStored &&
+		!theme.backgroundVideoUrl;
+}
+
+function cloneUserSettings(settings) {
+	return {
+		defaultCloak: settings.defaultCloak,
+		theme: {
+			...settings.theme,
+			colors: { ...settings.theme.colors },
+			backgroundVideoFile: null,
+		},
+	};
+}
+
+async function saveUserSettings(settings) {
+	const previousVideoId = userSettings.theme.backgroundVideoId || "";
+	const previousVideoObjectUrl = savedVideoObjectUrl;
+	const theme = { ...settings.theme };
+	const videoFile = theme.backgroundVideoFile;
+	delete theme.backgroundVideoFile;
+	if (videoFile) {
+		theme.backgroundVideoId = theme.pendingVideoId;
+		theme.backgroundVideoStored = true;
+	}
+	delete theme.pendingVideoId;
+	const savedSettings = { ...settings, theme };
+	let videoWritten = false;
 	try {
-		localStorage.setItem(
-			"classroom-user-settings",
-			JSON.stringify(userSettings)
-		);
-		return true;
-	} catch {
+		if (videoFile) {
+			await writeThemeVideo(theme.backgroundVideoId, videoFile);
+			videoWritten = true;
+		}
+		localStorage.setItem("classroom-user-settings", JSON.stringify(savedSettings));
+	} catch (error) {
+		if (videoWritten) {
+			try {
+				await deleteThemeVideo(theme.backgroundVideoId);
+			} catch (cleanupError) {
+				console.error(
+					"[Classroom] Unable to remove an unsaved theme video.",
+					cleanupError
+				);
+			}
+		}
 		const message = document.getElementById("user-settings-message");
 		if (message)
-			message.textContent = "Settings could not be saved in this browser.";
+			message.textContent = error.message;
 		return false;
 	}
+	userSettings = savedSettings;
+	hasUserTheme = true;
+	if (videoFile) {
+		if (
+			previousVideoObjectUrl &&
+			previousVideoObjectUrl !== previewVideoObjectUrl
+		) {
+			URL.revokeObjectURL(previousVideoObjectUrl);
+		}
+		savedVideoObjectUrl = previewVideoObjectUrl;
+		previewVideoObjectUrl = "";
+		previewVideoFile = null;
+	}
+	if (previousVideoId && previousVideoId !== theme.backgroundVideoId) {
+		try {
+			await deleteThemeVideo(previousVideoId);
+		} catch (error) {
+			console.error(
+				"[Classroom] Theme saved, but the previous video could not be removed.",
+				error
+			);
+			document.getElementById("user-settings-message").textContent =
+				`Theme saved, but the previous video could not be removed: ${error.message}`;
+		}
+		if (!videoFile && previousVideoObjectUrl) {
+			URL.revokeObjectURL(previousVideoObjectUrl);
+			savedVideoObjectUrl = "";
+		}
+	}
+	return true;
 }
 
 function readSettingsForm() {
+	const theme = settingsDraft.theme;
 	return {
 		...settingsDraft,
-		theme:
-			document.querySelector('input[name="theme-option"]:checked')?.value ||
-			document.getElementById("theme-select").value,
-		background: document.getElementById("background-select").value,
+		theme: {
+			...theme,
+			name: document.getElementById("theme-name").value.trim(),
+			colors: Object.fromEntries(
+				THEME_COLOR_KEYS.map((key) => [
+					key,
+					document.getElementById(`theme-color-${key}`).value,
+				])
+			),
+			backgroundType: document.getElementById("background-type").value,
+			backgroundImage: theme.backgroundImage || "",
+			backgroundVideoUrl: document
+				.getElementById("background-video-url")
+				.value.trim(),
+		},
 		defaultCloak: document.getElementById("default-cloak-select").value,
 	};
 }
 
 function syncSettingsForm(settings) {
-	document.getElementById("theme-select").value = settings.theme;
-	for (const option of document.querySelectorAll(
-		'input[name="theme-option"]'
-	)) {
-		option.checked = option.value === settings.theme;
+	const theme = settings.theme;
+	document.getElementById("theme-name").value = theme.name;
+	for (const key of THEME_COLOR_KEYS) {
+		document.getElementById(`theme-color-${key}`).value = theme.colors[key];
 	}
-	document.getElementById("background-select").value = settings.background;
+	document.getElementById("background-type").value = theme.backgroundType;
+	document.getElementById("background-video-url").value =
+		theme.backgroundVideoUrl || "";
 	document.getElementById("default-cloak-select").value = settings.defaultCloak;
 	const preview = document.getElementById("background-image-preview");
-	preview.hidden = !settings.backgroundImage;
-	preview.src = settings.backgroundImage || "";
-	document.getElementById("remove-background-image").hidden =
-		!settings.backgroundImage;
+	preview.hidden = theme.backgroundType !== "image" || !theme.backgroundImage;
+	preview.src = theme.backgroundImage || "";
 	document.getElementById("background-image-file").value = "";
 	document.getElementById("background-image-name").textContent =
-		settings.backgroundImage ? "Saved background image" : "No image selected";
+		theme.backgroundImage ? "Saved background image" : "No image selected";
+	document.getElementById("background-video-file").value = "";
+	document.getElementById("background-video-name").textContent =
+		theme.backgroundVideoStored
+			? "Saved video background"
+			: theme.backgroundVideoUrl
+				? "Using video URL"
+				: "No video selected";
+	document.getElementById("theme-save").textContent = hasUserTheme
+		? "Save theme"
+		: "Create theme";
+	document.getElementById("theme-onboarding-message").hidden = hasUserTheme;
+	document.getElementById("user-settings-close").hidden = !hasUserTheme;
+	updateBackgroundControls(theme);
 }
 
 function openUserSettings() {
-	settingsDraft = JSON.parse(JSON.stringify(userSettings));
+	settingsDraft = cloneUserSettings(userSettings);
 	syncSettingsForm(settingsDraft);
-	document.getElementById("user-settings-message").textContent = "";
+	document.getElementById("user-settings-message").textContent =
+		backgroundVideoError;
 	userSettingsDialog.showModal();
 }
 
 function previewUserSettings() {
 	settingsDraft = readSettingsForm();
 	applyUserSettings(settingsDraft);
+	updateBackgroundControls(settingsDraft.theme);
 }
 
 async function encodeBackgroundImage(file) {
@@ -1779,39 +2135,76 @@ document
 	.addEventListener("click", openUserSettings);
 document
 	.getElementById("user-settings-close")
-	.addEventListener("click", () => userSettingsDialog.close());
+	.addEventListener("click", () => {
+		if (!hasUserTheme) return;
+		userSettingsDialog.close();
+	});
 document
 	.getElementById("user-settings-form")
-	.addEventListener("submit", (event) => {
+	.addEventListener("submit", async (event) => {
 		event.preventDefault();
-		userSettings = readSettingsForm();
-		settingsDraft = null;
-		applyUserSettings(userSettings);
-		if (saveUserSettings()) {
+		const settings = readSettingsForm();
+		const theme = settings.theme;
+		if (!theme.name) {
 			document.getElementById("user-settings-message").textContent =
-				"Settings saved on this device.";
+				"Name your theme before saving.";
+			return;
+		}
+		if (!THEME_COLOR_KEYS.every((key) => isThemeColor(theme.colors[key]))) {
+			document.getElementById("user-settings-message").textContent =
+				"Choose a valid color for every theme color.";
+			return;
+		}
+		if (theme.backgroundType === "image" && !theme.backgroundImage) {
+			document.getElementById("user-settings-message").textContent =
+				"Choose an image for the home background.";
+			return;
+		}
+		if (theme.backgroundType === "video") {
+			const videoUrl = safeMediaUrl(theme.backgroundVideoUrl);
+			if (!theme.backgroundVideoFile && !videoUrl && !theme.backgroundVideoId) {
+				document.getElementById("user-settings-message").textContent =
+					"Choose a video file or enter a valid video URL.";
+				return;
+			}
+			theme.backgroundVideoUrl = videoUrl;
+			if (videoUrl) {
+				theme.backgroundVideoFile = null;
+				theme.backgroundVideoId = "";
+				theme.backgroundVideoStored = false;
+				delete theme.pendingVideoId;
+			}
+		}
+		if (await saveUserSettings(settings)) {
+			settingsDraft = null;
+			applyUserSettings(userSettings);
+			syncSettingsForm(userSettings);
+			document.getElementById("user-settings-message").textContent =
+				"Theme saved on this device.";
+			userSettingsDialog.close();
+			if (new URLSearchParams(location.search).get("admin") === "1") {
+				openAdminDialog();
+			}
 		}
 	});
-for (const id of ["background-select", "default-cloak-select"]) {
+for (const id of ["background-type", "default-cloak-select"]) {
 	document.getElementById(id).addEventListener("input", previewUserSettings);
 	document.getElementById(id).addEventListener("change", previewUserSettings);
 }
-document.querySelectorAll('input[name="theme-option"]').forEach((option) => {
-	option.addEventListener("change", () => {
-		document.getElementById("theme-select").value = option.value;
-		previewUserSettings();
-	});
-});
+for (const key of ["name", ...THEME_COLOR_KEYS]) {
+	document
+		.getElementById(key === "name" ? "theme-name" : `theme-color-${key}`)
+		.addEventListener("input", previewUserSettings);
+}
 document
 	.getElementById("background-image-file")
 	.addEventListener("change", async (event) => {
 		const file = event.target.files?.[0];
 		if (!file) return;
-		document.getElementById("background-image-name").textContent = file.name;
 		try {
 			settingsDraft = readSettingsForm();
-			settingsDraft.backgroundImage = await encodeBackgroundImage(file);
-			settingsDraft.background = "image";
+			settingsDraft.theme.backgroundImage = await encodeBackgroundImage(file);
+			settingsDraft.theme.backgroundType = "image";
 			syncSettingsForm(settingsDraft);
 			document.getElementById("background-image-name").textContent = file.name;
 			applyUserSettings(settingsDraft);
@@ -1822,36 +2215,97 @@ document
 				error.message;
 			event.target.value = "";
 			document.getElementById("background-image-name").textContent =
-				userSettings.backgroundImage
+				userSettings.theme.backgroundImage
 					? "Saved background image"
 					: "No image selected";
 		}
 	});
 document
-	.getElementById("remove-background-image")
+	.getElementById("background-video-file")
+	.addEventListener("change", (event) => {
+		const file = event.target.files?.[0];
+		if (!file) return;
+		const message = document.getElementById("user-settings-message");
+		if (!/^video\/(?:mp4|webm)$/.test(file.type)) {
+			message.textContent = "Choose an MP4 or WebM video.";
+			event.target.value = "";
+			return;
+		}
+		if (file.size > VIDEO_BACKGROUND_MAX_BYTES) {
+			message.textContent = "Choose a video smaller than 50 MB.";
+			event.target.value = "";
+			return;
+		}
+		settingsDraft = readSettingsForm();
+		settingsDraft.theme.backgroundType = "video";
+		settingsDraft.theme.backgroundVideoUrl = "";
+		settingsDraft.theme.backgroundVideoStored = false;
+		settingsDraft.theme.backgroundVideoFile = file;
+		settingsDraft.theme.pendingVideoId =
+			window.crypto?.randomUUID?.() ||
+			`${Date.now()}-${Math.random().toString(16).slice(2)}`;
+		syncSettingsForm(settingsDraft);
+		document.getElementById("background-video-name").textContent = file.name;
+		applyUserSettings(settingsDraft);
+		message.textContent = "Video preview ready. Save theme to keep it.";
+	});
+document
+	.getElementById("background-video-url")
+	.addEventListener("input", () => {
+		if (settingsDraft && settingsDraft.theme.backgroundVideoUrl !==
+			document.getElementById("background-video-url").value.trim()) {
+			settingsDraft.theme.backgroundVideoFile = null;
+			settingsDraft.theme.backgroundVideoId = "";
+			settingsDraft.theme.backgroundVideoStored = false;
+			delete settingsDraft.theme.pendingVideoId;
+			if (previewVideoObjectUrl) URL.revokeObjectURL(previewVideoObjectUrl);
+			previewVideoObjectUrl = "";
+			previewVideoFile = null;
+		}
+		previewUserSettings();
+	});
+document
+	.getElementById("background-media-remove")
 	.addEventListener("click", () => {
 		settingsDraft = readSettingsForm();
-		settingsDraft.backgroundImage = "";
-		if (settingsDraft.background === "image") settingsDraft.background = "grid";
+		settingsDraft.theme.backgroundImage = "";
+		settingsDraft.theme.backgroundType = "color";
+		settingsDraft.theme.backgroundVideoUrl = "";
+		settingsDraft.theme.backgroundVideoStored = false;
+		settingsDraft.theme.backgroundVideoFile = null;
+		settingsDraft.theme.backgroundVideoId = "";
+		delete settingsDraft.theme.pendingVideoId;
+		if (previewVideoObjectUrl) URL.revokeObjectURL(previewVideoObjectUrl);
+		previewVideoObjectUrl = "";
+		previewVideoFile = null;
 		syncSettingsForm(settingsDraft);
 		applyUserSettings(settingsDraft);
 	});
-document.getElementById("user-settings-reset").addEventListener("click", () => {
-	userSettings = { ...DEFAULT_USER_SETTINGS };
-	settingsDraft = null;
-	syncSettingsForm(userSettings);
-	applyUserSettings(userSettings);
-	if (saveUserSettings()) {
-		document.getElementById("user-settings-message").textContent =
-			"Default settings restored.";
-	}
+userSettingsDialog.addEventListener("cancel", (event) => {
+	if (!hasUserTheme) event.preventDefault();
 });
 userSettingsDialog.addEventListener("close", () => {
 	if (settingsDraft) {
 		settingsDraft = null;
+		if (previewVideoObjectUrl) URL.revokeObjectURL(previewVideoObjectUrl);
+		previewVideoObjectUrl = "";
+		previewVideoFile = null;
 		applyUserSettings(userSettings);
 	}
 });
+document
+	.getElementById("home-background-video")
+	.addEventListener("error", () => {
+		backgroundVideoError =
+			"Could not load the video background. Use a direct MP4 or WebM URL.";
+		document.getElementById("user-settings-message").textContent =
+			backgroundVideoError;
+	});
+document
+	.getElementById("home-background-video")
+	.addEventListener("loadeddata", () => {
+		backgroundVideoError = "";
+	});
 
 async function updateFullscreenState() {
 	const isFullscreen = Boolean(document.fullscreenElement);
@@ -2169,7 +2623,11 @@ document.addEventListener("keydown", (event) => {
 
 renderQuickLinks();
 createTab();
-if (new URLSearchParams(location.search).get("admin") === "1") {
+void restoreSavedThemeVideo();
+if (
+	hasUserTheme &&
+	new URLSearchParams(location.search).get("admin") === "1"
+) {
 	openAdminDialog();
 }
 
@@ -2180,6 +2638,10 @@ async function finishStartup() {
 		return;
 	}
 	startupScreen.hidden = true;
+	if (!hasUserTheme) {
+		openUserSettings();
+		return;
+	}
 	let pendingUrl;
 	try {
 		pendingUrl = sessionStorage.getItem(pendingCompatibilityNavigationKey);

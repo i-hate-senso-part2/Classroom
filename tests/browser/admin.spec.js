@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,23 @@ import { randomBytes, scryptSync } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 const password = "classroom-test-password";
+const returningUserSettings = {
+	theme: {
+		name: "Test theme",
+		colors: {
+			background: "#0c100e",
+			surface: "#151a17",
+			text: "#e8eee8",
+			accent: "#c4e879",
+		},
+		backgroundType: "color",
+		backgroundImage: "",
+		backgroundVideoUrl: "",
+		backgroundVideoId: "",
+		backgroundVideoStored: false,
+	},
+	defaultCloak: "normal",
+};
 let baseUrl;
 let dataDirectory;
 let serverProcess;
@@ -41,6 +58,17 @@ async function waitForServer() {
 	throw new Error("Classroom server did not become ready.");
 }
 
+async function useReturningUserSettings(page, settings = returningUserSettings) {
+	await page.addInitScript((savedSettings) => {
+		if (!localStorage.getItem("classroom-user-settings")) {
+			localStorage.setItem(
+				"classroom-user-settings",
+				JSON.stringify(savedSettings)
+			);
+		}
+	}, settings);
+}
+
 test.beforeAll(async () => {
 	dataDirectory = mkdtempSync(join(tmpdir(), "classroom-browser-test-"));
 	const salt = randomBytes(16);
@@ -71,6 +99,7 @@ test.afterAll(async () => {
 test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
 	page,
 }) => {
+	await useReturningUserSettings(page);
 	await page.goto(baseUrl);
 
 	for (const [label, url] of [
@@ -82,7 +111,160 @@ test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
 	}
 });
 
+test("first visit requires a saved custom theme", async ({ page }) => {
+	await page.goto(baseUrl);
+	await expect(page.locator("#user-settings-dialog")).toBeVisible();
+	await expect(page.locator("#user-settings-close")).toBeHidden();
+	await expect(page.locator("#theme-onboarding-message")).toContainText(
+		"Create and save a custom theme"
+	);
+	await page.keyboard.press("Escape");
+	await expect(page.locator("#user-settings-dialog")).toBeVisible();
+
+	await page.locator("#theme-name").fill("My first theme");
+	await page.locator("#theme-color-accent").fill("#4268d5");
+	await page.getByRole("button", { name: "Create theme" }).click();
+
+	await expect(page.locator("#user-settings-dialog")).toBeHidden();
+	expect(
+		await page.evaluate(() => {
+			const settings = JSON.parse(
+				localStorage.getItem("classroom-user-settings")
+			);
+			return {
+				name: settings.theme.name,
+				accent: settings.theme.colors.accent,
+			};
+		})
+	).toEqual({ name: "My first theme", accent: "#4268d5" });
+});
+
+test("existing preset preferences migrate to a custom theme", async ({ page }) => {
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			"classroom-user-settings",
+			JSON.stringify({
+				theme: "ocean",
+				background: "lines",
+				defaultCloak: "normal",
+				backgroundImage: "",
+			})
+		);
+	});
+	await page.goto(baseUrl);
+
+	await expect(page.locator("#user-settings-dialog")).toBeHidden();
+	await page.getByRole("button", { name: "User settings" }).click();
+	await expect(page.locator("#theme-name")).toHaveValue("My theme");
+	await expect(page.locator("#background-type")).toHaveValue("color");
+	expect(
+		await page.locator("html").evaluate((root) =>
+			root.style.getPropertyValue("--custom-accent")
+		)
+	).toBe("#69d6cb");
+});
+
+test("custom image backgrounds remain available", async ({ page }) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "User settings" }).click();
+	await page.locator("#background-type").selectOption("image");
+	await page.locator("#background-image-file").setInputFiles({
+		name: "background.png",
+		mimeType: "image/png",
+		buffer: readFileSync(join(process.cwd(), "public/sj.png")),
+	});
+
+	await expect(page.locator("#background-image-preview")).toBeVisible();
+	await page.getByRole("button", { name: "Save theme" }).click();
+	await expect(page.locator("#user-settings-dialog")).toBeHidden();
+	expect(
+		await page.evaluate(
+			() =>
+				JSON.parse(localStorage.getItem("classroom-user-settings")).theme
+					.backgroundImage
+		)
+	).toMatch(/^data:image\/webp;base64,/);
+	await expect(page.locator("html")).toHaveAttribute(
+		"data-home-background",
+		"image"
+	);
+});
+
+test("uploaded video backgrounds persist locally", async ({ page }) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "User settings" }).click();
+	await page.locator("#background-type").selectOption("video");
+	await page.locator("#background-video-file").setInputFiles({
+		name: "background.mp4",
+		mimeType: "video/mp4",
+		buffer: Buffer.from("test video"),
+	});
+	await expect(page.locator("#background-video-name")).toHaveText(
+		"background.mp4"
+	);
+	await page.getByRole("button", { name: "Save theme" }).click();
+
+	await expect(page.locator("#user-settings-dialog")).toBeHidden();
+	await expect(page.locator("#home-background-video")).toBeVisible();
+	const savedVideo = await page.evaluate(async () => {
+		const settings = JSON.parse(
+			localStorage.getItem("classroom-user-settings")
+		);
+		const database = await new Promise((resolve, reject) => {
+			const request = indexedDB.open("classroom-theme-assets", 1);
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+		const file = await new Promise((resolve, reject) => {
+			const request = database
+				.transaction("videos", "readonly")
+				.objectStore("videos")
+				.get(settings.theme.backgroundVideoId);
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+		database.close();
+		return {
+			type: settings.theme.backgroundType,
+			stored: settings.theme.backgroundVideoStored,
+			mimeType: file?.type,
+		};
+	});
+	expect(savedVideo).toEqual({
+		type: "video",
+		stored: true,
+		mimeType: "video/mp4",
+	});
+
+	await page.reload();
+	await expect
+		.poll(() =>
+			page
+				.locator("#home-background-video")
+				.evaluate((video) => video.src)
+		)
+		.toContain("blob:");
+
+	await page.getByRole("button", { name: "User settings" }).click();
+	await page.locator("#background-type").selectOption("video");
+	await page
+		.locator("#background-video-url")
+		.fill("https://cdn.example/background.webm");
+	await page.getByRole("button", { name: "Save theme" }).click();
+	await expect(page.locator("#user-settings-dialog")).toBeHidden();
+	expect(
+		await page.evaluate(
+			() =>
+				JSON.parse(localStorage.getItem("classroom-user-settings")).theme
+					.backgroundVideoUrl
+		)
+	).toBe("https://cdn.example/background.webm");
+});
+
 test("tab appearance cloaks only the outer Classroom tab", async ({ page }) => {
+	await useReturningUserSettings(page);
 	await page.goto(baseUrl);
 	await page.getByRole("button", { name: "User settings" }).click();
 	await page.locator("#default-cloak-select").selectOption("google");
@@ -113,7 +295,23 @@ test("compatibility switch preserves the proxied destination on V1.1.0", async (
 	await page.addInitScript(() => {
 		localStorage.setItem(
 			"classroom-user-settings",
-			JSON.stringify({ defaultCloak: "google" })
+			JSON.stringify({
+				theme: {
+					name: "Proxy test",
+					colors: {
+						background: "#0c100e",
+						surface: "#151a17",
+						text: "#e8eee8",
+						accent: "#c4e879",
+					},
+					backgroundType: "color",
+					backgroundImage: "",
+					backgroundVideoUrl: "",
+					backgroundVideoId: "",
+					backgroundVideoStored: false,
+				},
+				defaultCloak: "google",
+			})
 		);
 		if (!localStorage.getItem("classroom-scramjet-version")) {
 			localStorage.setItem("classroom-scramjet-version", "v2");
@@ -160,6 +358,7 @@ test("compatibility switch preserves the proxied destination on V1.1.0", async (
 test("admin preview, save, restore, and homepage reflect shared links", async ({
 	page,
 }) => {
+	await useReturningUserSettings(page);
 	await page.route("**/config.js", (route) =>
 		route.fulfill({
 			contentType: "application/javascript",
@@ -277,6 +476,7 @@ test("admin preview, save, restore, and homepage reflect shared links", async ({
 test("unreachable primary Wisp endpoint falls back to the next configured endpoint", async ({
 	page,
 }) => {
+	await useReturningUserSettings(page);
 	await page.route("**/config.js", (route) =>
 		route.fulfill({
 			contentType: "application/javascript",

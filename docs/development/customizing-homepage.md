@@ -3,7 +3,7 @@
 The new-tab homepage is split between markup, styles, and browser behavior:
 
 - `public/index.html` contains the `#home-screen` layout, search form, quick-link container, and footer.
-- `public/browser.css` styles `.home-screen`, `.home-content`, `.home-lead`, and `.quick-links`, including responsive layouts and background variants.
+- `public/browser.css` styles `.home-screen`, `.home-content`, `.home-lead`, and `.quick-links`, including responsive layouts and custom image/video backgrounds.
 - `public/index.js` defines the built-in `defaultLinks` and `renderQuickLinks()`, which combines built-in links, shared administrator links, and visitor bookmarks.
 
 ## Change the layout or copy
@@ -20,7 +20,7 @@ Visitor bookmarks are stored in that visitor's browser. Shared links are managed
 
 ## Change appearance
 
-Update the `.home-*` and `.quick-link` rules in `public/browser.css`. The theme variables near the top of the stylesheet provide the existing color palette. The homepage background choices are applied through `data-home-background`; preserve those selectors if changing how background preferences work.
+Update the `.home-*` and `.quick-link` rules in `public/browser.css`. Theme colors are applied through the `--custom-*` variables, and the home background type is applied through `data-home-background`. Preserve those hooks when changing theme or background preferences.
 
 ## Verify
 

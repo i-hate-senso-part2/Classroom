@@ -12,7 +12,7 @@ The UI is a single static page served from `public/`. Browser features are imple
 
 ## Preferences
 
-- Four dark-only color palettes, home background style or uploaded image, and default tab appearance are saved as `classroom-user-settings` in local storage. Uploaded images are resized and stored on this device only.
+- Custom theme colors, the selected home background, and default tab appearance are saved as `classroom-user-settings` in local storage. First-time visitors must create and save a named theme before using the homepage. Uploaded images are resized and stored on this device; uploaded MP4/WebM video backgrounds up to 50 MB are stored in IndexedDB. A direct MP4/WebM URL can be used instead.
 - Bookmarks are saved as `classroom-bookmarks` in local storage.
 - User settings preview changes before saving; closing without saving restores the last saved preferences. Reset restores the default dark palette and appearance.
 - The fullscreen control hides browser chrome; use its floating exit button or press `Escape` to leave fullscreen.
