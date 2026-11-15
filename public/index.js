@@ -34,6 +34,7 @@ const versionPickerMenu = document.getElementById("scramjet-version-menu");
 const compatibilityDialog = document.getElementById("compatibility-dialog");
 const compatibilityTitle = document.getElementById("compatibility-title");
 const compatibilityMessage = document.getElementById("compatibility-message");
+const unsupportedSiteDialog = document.getElementById("unsupported-site-dialog");
 const pendingCompatibilityNavigationKey =
 	"classroom-pending-compatibility-navigation";
 const confirmationDialog = document.getElementById("confirmation-dialog");
@@ -94,11 +95,6 @@ const defaultLinks = [
 		label: "Chess",
 		url: "https://www.chess.com/",
 		logo: "/logos/chess.png",
-	},
-	{
-		label: "Minecraft",
-		url: "https://eaglercraft.com/play",
-		logo: "/logos/minecraft.webp",
 	},
 	{
 		label: "GeForce NOW",
@@ -494,6 +490,9 @@ document
 	.getElementById("compatibility-continue")
 	.addEventListener("click", () => compatibilityDialog.close());
 document
+	.getElementById("unsupported-site-close")
+	.addEventListener("click", () => unsupportedSiteDialog.close());
+document
 	.getElementById("confirmation-cancel")
 	.addEventListener("click", () => confirmationDialog.close("cancel"));
 confirmationAccept.addEventListener("click", () =>
@@ -633,12 +632,25 @@ function renderTabs() {
 		select.setAttribute("aria-selected", String(tab.id === activeTabId));
 		const displayTitle = tab.title;
 		select.title = displayTitle;
-		select.innerHTML =
-			'<span class="tab-favicon" aria-hidden="true"><img src="/sj.png" alt="" /></span>';
+		const favicon = document.createElement("span");
+		favicon.className = "tab-favicon";
+		favicon.setAttribute("aria-hidden", "true");
+		const faviconImage = document.createElement("img");
+		faviconImage.alt = "";
+		faviconImage.addEventListener("error", () => {
+			if (tab.favicon && tab.favicon !== "/sj.png") {
+				console.warn("[Classroom] Unable to load the page favicon.", {
+					url: tab.favicon,
+				});
+				setTabFavicon(tab, "/sj.png");
+			}
+		});
+		faviconImage.src = tab.favicon || "/sj.png";
+		favicon.append(faviconImage);
 		const title = document.createElement("span");
 		title.className = "tab-title";
 		title.textContent = displayTitle;
-		select.append(title);
+		select.append(favicon, title);
 		const close = document.createElement("button");
 		close.type = "button";
 		close.className = "tab-close";
@@ -649,6 +661,44 @@ function renderTabs() {
 		item.append(select, close);
 		tabList.append(item);
 	}
+}
+
+function setTabFavicon(tab, faviconUrl) {
+	tab.favicon = faviconUrl;
+	const item = Array.from(tabList.children).find(
+		(element) => element.dataset.tabId === tab.id
+	);
+	const image = item?.querySelector(".tab-favicon img");
+	if (image) image.src = faviconUrl || "/sj.png";
+}
+
+function getTabFaviconUrl(frame, pageUrl) {
+	const pageDocument = frame.element.contentDocument;
+	if (!pageDocument) return null;
+
+	const iconHref =
+		pageDocument.querySelector('link[rel~="icon" i]')?.getAttribute("href") ||
+		"/favicon.ico";
+	const faviconUrl = new URL(iconHref, pageUrl);
+	if (
+		faviconUrl.protocol === "data:" &&
+		faviconUrl.href.startsWith("data:image/")
+	) {
+		return faviconUrl.href;
+	}
+	if (!["http:", "https:"].includes(faviconUrl.protocol)) return null;
+
+	const rawUrl = new URL(iconHref, location.href);
+	const prefix =
+		frame.prefix || controller.config?.prefix || legacyScramjetPrefix;
+	const proxyPrefix = new URL(prefix, location.href).pathname;
+	if (
+		rawUrl.origin === location.origin &&
+		rawUrl.pathname.startsWith(proxyPrefix)
+	) {
+		return rawUrl.href;
+	}
+	return new URL(controller.encodeUrl(faviconUrl), location.href).href;
 }
 
 function syncBrowser() {
@@ -1550,6 +1600,23 @@ function getV1RecommendedSite(url) {
 	return null;
 }
 
+function isEaglercraftSearch(input) {
+	return /\beaglercraft\b/i.test(input);
+}
+
+function isEaglercraftUrl(url) {
+	try {
+		const hostname = new URL(url).hostname.toLowerCase();
+		return hostname === "eaglercraft.com" || hostname.endsWith(".eaglercraft.com");
+	} catch {
+		return false;
+	}
+}
+
+function showUnsupportedSiteDialog() {
+	if (!unsupportedSiteDialog.open) unsupportedSiteDialog.showModal();
+}
+
 function showConfirmation({ title, message, confirmLabel }) {
 	confirmationTitle.textContent = title;
 	confirmationMessage.textContent = message;
@@ -1791,6 +1858,7 @@ function recordHistory(tab, url) {
 
 function updateTabUrl(tab, url) {
 	if (!url) return;
+	if (tab.url !== url) tab.favicon = null;
 	const incompatibleSite = getV2IncompatibleSite(url);
 	if (incompatibleSite !== tab.compatibilityWarningSite) {
 		tab.compatibilityWarningSite = incompatibleSite;
@@ -1836,6 +1904,7 @@ function createFrame(tab) {
 		}
 		window.clearTimeout(tab.navigationTimer);
 		tab.navigationTimer = null;
+		let pageUrl = tab.url;
 		try {
 			const frameUrl = new URL(frame.element.contentWindow.location.href);
 			const decodedUrl =
@@ -1846,8 +1915,20 @@ function createFrame(tab) {
 								new URL(frame.prefix, location.href).pathname.length
 							)
 						);
-			if (decodedUrl) updateTabUrl(tab, decodedUrl);
+			if (decodedUrl) {
+				updateTabUrl(tab, decodedUrl);
+				pageUrl = decodedUrl;
+			}
 		} catch {}
+		try {
+			const faviconUrl = getTabFaviconUrl(frame, pageUrl);
+			if (faviconUrl) setTabFavicon(tab, faviconUrl);
+		} catch (error) {
+			console.warn("[Classroom] Unable to read the page favicon.", {
+				url: pageUrl,
+				error,
+			});
+		}
 		setLoading(false, tab);
 	});
 	tab.frame = frame;
@@ -1989,6 +2070,10 @@ async function prepareTransport() {
 }
 
 async function navigateTab(tab, url) {
+	if (isEaglercraftUrl(url)) {
+		showUnsupportedSiteDialog();
+		return;
+	}
 	showError("");
 	window.clearTimeout(tab.navigationTimer);
 	tab.navigationTimer = null;
@@ -2041,6 +2126,7 @@ function createTab() {
 	const tab = {
 		id: `tab-${++tabSequence}`,
 		title: "New tab",
+		favicon: null,
 		cloak:
 			userSettings.defaultCloak === "normal" ? null : userSettings.defaultCloak,
 		url: "",
@@ -2079,6 +2165,7 @@ function goHome() {
 	tab.navigationTimer = null;
 	tab.home = true;
 	tab.title = "New tab";
+	tab.favicon = null;
 	setLoading(false);
 	showError("");
 	syncBrowser();
@@ -2135,6 +2222,10 @@ form.addEventListener("submit", (event) => {
 	event.preventDefault();
 	const value = address.value.trim();
 	if (!value) return;
+	if (isEaglercraftSearch(value)) {
+		showUnsupportedSiteDialog();
+		return;
+	}
 	maybeShowTestingOverlay();
 	navigateTab(activeTab(), search(value, searchEngine.value));
 });
@@ -2143,6 +2234,10 @@ homeSearchForm.addEventListener("submit", (event) => {
 	event.preventDefault();
 	const value = homeAddress.value.trim();
 	if (!value) return;
+	if (isEaglercraftSearch(value)) {
+		showUnsupportedSiteDialog();
+		return;
+	}
 	address.value = value;
 	maybeShowTestingOverlay();
 	navigateTab(activeTab(), search(value, searchEngine.value));

@@ -111,6 +111,37 @@ test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
 	}
 });
 
+test("Eaglercraft searches and links show an unsupported notice", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+
+	await page.locator("#home-address").fill("Eaglercraft");
+	await page
+		.locator("#home-search-form")
+		.evaluate((form) => form.requestSubmit());
+	const notice = page.locator("#unsupported-site-dialog");
+	await expect(notice).toBeVisible();
+	await expect(notice).toContainText(
+		"Eaglercraft is unsupported for this website."
+	);
+	await expect(page.locator("#frame-host iframe")).toHaveCount(0);
+
+	await page.getByRole("button", { name: "Got it" }).click();
+	await page.evaluate(() => {
+		const link = document.createElement("button");
+		link.type = "button";
+		link.className = "quick-link";
+		link.dataset.url = "https://play.eaglercraft.com/";
+		link.textContent = "Eaglercraft test";
+		document.querySelector("#quick-links").append(link);
+	});
+	await page.getByRole("button", { name: "Eaglercraft test" }).click();
+	await expect(notice).toBeVisible();
+	await expect(page.locator("#frame-host iframe")).toHaveCount(0);
+});
+
 test("rare search overlay can only be dismissed with its close button", async ({
 	page,
 }) => {
@@ -311,8 +342,8 @@ test("tab appearance cloaks only the outer Classroom tab", async ({ page }) => {
 	await page.getByRole("button", { name: "User settings" }).click();
 	for (const [id, title, logo] of [
 		["normal", "New tab", "/sj.png"],
-		["kahoot", "Enter Game PIN - Kahoot!", "/logos/kahoot.webp"],
-		["google", "Google", "/logos/google-circle.webp"],
+		["kahoot", "Enter Game PIN - Kahoot!", "/logos/kahoot-icon.svg"],
+		["google", "Google", "/logos/google-circle.png"],
 		["classroom", "Home - Classroom", "/logos/classroom.png"],
 		["wikipedia", "Wikipedia", "/logos/wikipedia.webp"],
 	]) {
