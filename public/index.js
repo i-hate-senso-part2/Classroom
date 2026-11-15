@@ -113,7 +113,7 @@ const defaultLinks = [
 		{
 		label: "ChatGPT",
 		url: "https://chatgpt.com",
-		logo: "/logos/chatgpt.webp",
+		logo: "/logos/chatgpt.png",
 	},
 		{
 		label: "Claude",
@@ -123,8 +123,8 @@ const defaultLinks = [
 ];
 const cloakTemplates = [
 	{ id: "normal", title: "", logo: "/sj.png" },
-	{ id: "kahoot", title: "Enter Game PIN - Kahoot!", logo: "/logos/kahoot.webp" },
-	{ id: "google", title: "Google", logo: "/logos/google-circle.webp" },
+	{ id: "kahoot", title: "Enter Game PIN - Kahoot!", logo: "/logos/kahoot.png" },
+	{ id: "google", title: "Google", logo: "/logos/google-circle.png" },
 	{ id: "classroom", title: "Home - Classroom", logo: "/logos/classroom.png" },
 	{ id: "wikipedia", title: "Wikipedia", logo: "/logos/wikipedia.webp" },
 ];
