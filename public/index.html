@@ -831,6 +831,17 @@
 					<div class="background-image-preview-row">
 						<img id="background-image-preview" alt="" hidden />
 					</div>
+					<label class="setting-row" for="background-image-overlay">
+						<span>
+							<strong>Overlay with page color</strong>
+							<small>Turn this off to show the image without a tint.</small>
+						</span>
+						<input
+							id="background-image-overlay"
+							type="checkbox"
+							checked
+						/>
+					</label>
 				</div>
 				<div id="background-video-controls" hidden>
 					<label for="background-video-file">Video background</label>
@@ -870,10 +881,10 @@
 				<label for="default-cloak-select">Default tab appearance</label>
 				<select id="default-cloak-select">
 					<option value="normal">Original</option>
+					<option value="kahoot">Enter Game PIN - Kahoot!</option>
 					<option value="google">Google</option>
-					<option value="youtube">YouTube</option>
-					<option value="geforce">Google Classroom</option>
-					<option value="tiktok">TikTok</option>
+					<option value="classroom">Home - Classroom</option>
+					<option value="wikipedia">Wikipedia</option>
 				</select>
 				<div class="settings-actions">
 					<button id="theme-save" class="dialog-primary" type="submit">
@@ -899,6 +910,25 @@
 				alt="Access restricted. This website has been blocked by your administrator."
 			/>
 		</section>
+		<dialog
+			id="testing-overlay"
+			class="testing-overlay"
+			aria-label="Temporary overlay"
+			hidden
+		>
+			<img src="/testing.webp" alt="" />
+			<button
+				id="testing-overlay-close"
+				class="testing-overlay-close"
+				type="button"
+				aria-label="Close overlay"
+				title="Close"
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true">
+					<path d="m6 6 12 12M18 6 6 18" />
+				</svg>
+			</button>
+		</dialog>
 		<button
 			id="fullscreen-exit"
 			class="fullscreen-exit"

@@ -53,6 +53,8 @@ const homeScreen = document.getElementById("home-screen");
 const progress = document.getElementById("browser-progress");
 const quickLinks = document.getElementById("quick-links");
 const startupScreen = document.getElementById("startup-screen");
+const testingOverlay = document.getElementById("testing-overlay");
+const testingOverlayClose = document.getElementById("testing-overlay-close");
 const adminDialog = document.getElementById("admin-dialog");
 const announcementDialog = document.getElementById("announcement-dialog");
 const announcementMessage = document.getElementById("announcement-message");
@@ -108,6 +110,16 @@ const defaultLinks = [
 		url: "https://www.tiktok.com/",
 		logo: "/logos/tiktok.png",
 	},
+		{
+		label: "ChatGPT",
+		url: "https://chatgpt.com",
+		logo: "/logos/chatgpt.webp",
+	},
+		{
+		label: "Claude",
+		url: "https://www.claude.ai/",
+		logo: "/logos/claude.webp",
+	},
 ];
 const cloakTemplates = [
 	{ id: "normal", title: "", logo: "/sj.png" },
@@ -127,6 +139,7 @@ const THEME_COLORS = Object.freeze({
 });
 const THEME_COLOR_KEYS = Object.keys(THEME_COLORS);
 const VIDEO_BACKGROUND_MAX_BYTES = 50 * 1024 * 1024;
+const TESTING_OVERLAY_SEARCH_CHANCE = 1 / 10000;
 const THEME_ASSET_DB_NAME = "classroom-theme-assets";
 const THEME_ASSET_STORE = "videos";
 const LEGACY_THEME_COLORS = {
@@ -182,6 +195,7 @@ function defaultUserSettings() {
 			colors: { ...THEME_COLORS },
 			backgroundType: "color",
 			backgroundImage: "",
+			backgroundImageOverlay: true,
 			backgroundVideoUrl: "",
 			backgroundVideoId: "",
 			backgroundVideoStored: false,
@@ -274,6 +288,8 @@ function loadUserSettings() {
 								? backgroundType
 								: "color",
 						backgroundImage,
+						backgroundImageOverlay:
+							theme.backgroundImageOverlay !== false,
 						backgroundVideoUrl,
 						backgroundVideoId,
 						backgroundVideoStored,
@@ -297,6 +313,7 @@ function loadUserSettings() {
 					backgroundType:
 						stored.background === "image" && legacyImage ? "image" : "color",
 					backgroundImage: legacyImage,
+					backgroundImageOverlay: true,
 					backgroundVideoUrl: "",
 					backgroundVideoId: "",
 					backgroundVideoStored: false,
@@ -668,6 +685,7 @@ function applyUserSettings(settings) {
 	const theme = settings.theme;
 	root.dataset.theme = "custom";
 	root.dataset.homeBackground = theme.backgroundType;
+	root.dataset.homeImageOverlay = String(theme.backgroundImageOverlay !== false);
 	root.style.setProperty("--custom-background", theme.colors.background);
 	root.style.setProperty("--custom-surface", theme.colors.surface);
 	root.style.setProperty("--custom-text", theme.colors.text);
@@ -825,6 +843,9 @@ function readSettingsForm() {
 			),
 			backgroundType: document.getElementById("background-type").value,
 			backgroundImage: theme.backgroundImage || "",
+			backgroundImageOverlay: document.getElementById(
+				"background-image-overlay"
+			).checked,
 			backgroundVideoUrl: document
 				.getElementById("background-video-url")
 				.value.trim(),
@@ -840,6 +861,8 @@ function syncSettingsForm(settings) {
 		document.getElementById(`theme-color-${key}`).value = theme.colors[key];
 	}
 	document.getElementById("background-type").value = theme.backgroundType;
+	document.getElementById("background-image-overlay").checked =
+		theme.backgroundImageOverlay !== false;
 	document.getElementById("background-video-url").value =
 		theme.backgroundVideoUrl || "";
 	document.getElementById("default-cloak-select").value = settings.defaultCloak;
@@ -2080,6 +2103,28 @@ renderMenu();
 setSearchEngine("google");
 applyUserSettings(userSettings);
 
+function maybeShowTestingOverlay() {
+	if (testingOverlay.open || Math.random() >= TESTING_OVERLAY_SEARCH_CHANCE) {
+		return;
+	}
+	testingOverlay.hidden = false;
+	testingOverlay.showModal();
+	testingOverlayClose.focus();
+}
+
+testingOverlay.addEventListener("cancel", (event) => {
+	event.preventDefault();
+});
+testingOverlay.addEventListener("keydown", (event) => {
+	if (event.key !== "Tab") return;
+	event.preventDefault();
+	testingOverlayClose.focus();
+});
+testingOverlayClose.addEventListener("click", () => {
+	testingOverlay.close();
+	testingOverlay.hidden = true;
+});
+
 address.addEventListener("keydown", (event) => {
 	if (event.key !== "Enter") return;
 	event.preventDefault();
@@ -2090,6 +2135,7 @@ form.addEventListener("submit", (event) => {
 	event.preventDefault();
 	const value = address.value.trim();
 	if (!value) return;
+	maybeShowTestingOverlay();
 	navigateTab(activeTab(), search(value, searchEngine.value));
 });
 
@@ -2098,6 +2144,7 @@ homeSearchForm.addEventListener("submit", (event) => {
 	const value = homeAddress.value.trim();
 	if (!value) return;
 	address.value = value;
+	maybeShowTestingOverlay();
 	navigateTab(activeTab(), search(value, searchEngine.value));
 });
 
@@ -2187,7 +2234,11 @@ document
 			}
 		}
 	});
-for (const id of ["background-type", "default-cloak-select"]) {
+for (const id of [
+	"background-type",
+	"background-image-overlay",
+	"default-cloak-select",
+]) {
 	document.getElementById(id).addEventListener("input", previewUserSettings);
 	document.getElementById(id).addEventListener("change", previewUserSettings);
 }

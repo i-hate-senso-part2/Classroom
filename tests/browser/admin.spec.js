@@ -111,6 +111,30 @@ test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
 	}
 });
 
+test("rare search overlay can only be dismissed with its close button", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.addInitScript(() => {
+		Math.random = () => 0;
+	});
+	await page.goto(baseUrl);
+	await page.locator("#home-address").fill("example.com");
+	await page
+		.locator("#home-search-form")
+		.evaluate((form) => form.requestSubmit());
+
+	const overlay = page.locator("#testing-overlay");
+	await expect(overlay).toBeVisible();
+	await expect(overlay.locator("img")).toHaveAttribute("src", "/testing.webp");
+	await page.keyboard.press("Escape");
+	await expect(overlay).toBeVisible();
+	await overlay.click({ position: { x: 100, y: 100 } });
+	await expect(overlay).toBeVisible();
+	await page.getByRole("button", { name: "Close overlay" }).click();
+	await expect(overlay).toBeHidden();
+});
+
 test("first visit requires a saved custom theme", async ({ page }) => {
 	await page.goto(baseUrl);
 	await expect(page.locator("#user-settings-dialog")).toBeVisible();
@@ -176,19 +200,37 @@ test("custom image backgrounds remain available", async ({ page }) => {
 	});
 
 	await expect(page.locator("#background-image-preview")).toBeVisible();
+	await page.locator("#background-image-overlay").uncheck();
+	await expect(page.locator("html")).toHaveAttribute(
+		"data-home-image-overlay",
+		"false"
+	);
+	expect(
+		await page
+			.locator("#home-screen")
+			.evaluate((element) => getComputedStyle(element).backgroundImage)
+	).not.toContain("linear-gradient");
 	await page.getByRole("button", { name: "Save theme" }).click();
 	await expect(page.locator("#user-settings-dialog")).toBeHidden();
-	expect(
-		await page.evaluate(
-			() =>
-				JSON.parse(localStorage.getItem("classroom-user-settings")).theme
-					.backgroundImage
-		)
-	).toMatch(/^data:image\/webp;base64,/);
+	const imageSettings = await page.evaluate(
+		() => JSON.parse(localStorage.getItem("classroom-user-settings")).theme
+	);
+	expect(imageSettings.backgroundImage).toMatch(/^data:image\/webp;base64,/);
+	expect(imageSettings.backgroundImageOverlay).toBe(false);
 	await expect(page.locator("html")).toHaveAttribute(
 		"data-home-background",
 		"image"
 	);
+	await page.reload();
+	await expect(page.locator("html")).toHaveAttribute(
+		"data-home-image-overlay",
+		"false"
+	);
+	expect(
+		await page.evaluate(
+			() => getComputedStyle(document.getElementById("home-screen")).backgroundImage
+		)
+	).not.toContain("linear-gradient");
 });
 
 test("uploaded video backgrounds persist locally", async ({ page }) => {
@@ -267,17 +309,25 @@ test("tab appearance cloaks only the outer Classroom tab", async ({ page }) => {
 	await useReturningUserSettings(page);
 	await page.goto(baseUrl);
 	await page.getByRole("button", { name: "User settings" }).click();
-	await page.locator("#default-cloak-select").selectOption("google");
-
-	await expect(page).toHaveTitle("Google");
+	for (const [id, title, logo] of [
+		["normal", "New tab", "/sj.png"],
+		["kahoot", "Enter Game PIN - Kahoot!", "/logos/kahoot.webp"],
+		["google", "Google", "/logos/google-circle.webp"],
+		["classroom", "Home - Classroom", "/logos/classroom.png"],
+		["wikipedia", "Wikipedia", "/logos/wikipedia.webp"],
+	]) {
+		await page.locator("#default-cloak-select").selectOption(id);
+		await expect(page).toHaveTitle(title);
+		await expect(page.locator("#browser-favicon")).toHaveAttribute(
+			"href",
+			logo
+		);
+		expect((await page.request.get(`${baseUrl}${logo}`)).ok()).toBe(true);
+	}
 	await expect(page.locator("#tab-list .tab-title")).toHaveText("New tab");
 	await expect(page.locator("#tab-list .tab-favicon img")).toHaveAttribute(
 		"src",
 		"/sj.png"
-	);
-	await expect(page.locator("#browser-favicon")).toHaveAttribute(
-		"href",
-		"/logos/google-circle.webp"
 	);
 });
 
