@@ -558,7 +558,12 @@ function openAdminDialog() {
 async function adminRequest(path, options = {}) {
 	const response = await fetch(path, {
 		...options,
-		headers: { "content-type": "application/json", ...options.headers },
+		headers: {
+			...(options.body === undefined
+				? {}
+				: { "content-type": "application/json" }),
+			...options.headers,
+		},
 	});
 	const result = await response.json().catch(() => ({}));
 	if (!response.ok)

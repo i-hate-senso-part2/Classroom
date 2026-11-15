@@ -242,6 +242,9 @@ test("admin preview, save, restore, and homepage reflect shared links", async ({
 		.locator("#admin-dialog")
 		.evaluate((dialog) => dialog.getBoundingClientRect().width);
 	expect(dialogWidth).toBeLessThanOrEqual(390);
+	await page.getByRole("button", { name: "Sign out" }).click();
+	await expect(page.locator("#admin-settings")).toBeHidden();
+	await expect(page.locator("#admin-login-form")).toBeVisible();
 });
 
 test("unreachable primary Wisp endpoint falls back to the next configured endpoint", async ({
