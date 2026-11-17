@@ -111,6 +111,70 @@ test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
 	}
 });
 
+test("V1 DuckDuckGo searches use the lightweight results page", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.addInitScript(() =>
+		localStorage.setItem("classroom-scramjet-version", "v1")
+	);
+	await page.goto(baseUrl);
+	await page.locator(".engine-trigger").click();
+	await page.locator('.engine-option[data-engine="duckduckgo"]').click();
+
+	const result = await page.evaluate(() =>
+		search("classroom proxy", document.querySelector("#sj-search-engine").value)
+	);
+	expect(result).toBe("https://html.duckduckgo.com/html/?q=classroom%20proxy");
+});
+
+test("worker activation retries the selected worker instead of a stale waiter", async ({
+	page,
+}) => {
+	await page.goto(baseUrl);
+
+	const result = await page.evaluate(async () => {
+		class Worker extends EventTarget {
+			constructor(scriptURL, state) {
+				super();
+				this.scriptURL = scriptURL;
+				this.state = state;
+				this.messages = 0;
+			}
+
+			postMessage() {
+				this.messages++;
+				if (this.scriptURL === expectedScript && this.messages === 2) {
+					registration.active = this;
+					this.state = "activated";
+					this.dispatchEvent(new Event("statechange"));
+				}
+			}
+		}
+
+		const expectedScript = new URL("/sw.js?v=test", location.href).href;
+		const staleWaitingWorker = new Worker("/sw-v1.js?v=old", "installed");
+		const selectedWorker = new Worker(expectedScript, "installed");
+		const registration = new EventTarget();
+		registration.active = new Worker("/sw-v1.js?v=old", "activated");
+		registration.installing = selectedWorker;
+		registration.waiting = staleWaitingWorker;
+		registration.scope = `${location.origin}/`;
+		registration.update = async () => {};
+
+		await waitForActiveWorker(registration, expectedScript);
+		return {
+			selectedMessages: selectedWorker.messages,
+			staleMessages: staleWaitingWorker.messages,
+			activeScript: registration.active.scriptURL,
+		};
+	});
+
+	expect(result.selectedMessages).toBe(2);
+	expect(result.staleMessages).toBe(0);
+	expect(result.activeScript).toContain("/sw.js?v=test");
+});
+
 test("Eaglercraft searches and links show an unsupported notice", async ({
 	page,
 }) => {

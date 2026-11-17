@@ -355,7 +355,10 @@ function renderMenu() {
 function setSearchEngine(engineKey) {
 	const normalizedKey = SEARCH_ENGINES[engineKey] ? engineKey : "google";
 	const engine = SEARCH_ENGINES[normalizedKey];
-	searchEngine.value = engine.url;
+	searchEngine.value =
+		normalizedKey === "duckduckgo" && scramjetVersion === "v1"
+			? "https://html.duckduckgo.com/html/?q=%s"
+			: engine.url;
 
 	if (trigger) {
 		trigger.dataset.engine = normalizedKey;

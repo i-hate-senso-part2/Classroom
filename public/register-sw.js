@@ -1,5 +1,5 @@
 "use strict";
-const serviceWorkerScriptVersion = "v1-console-noise-20261113";
+const serviceWorkerScriptVersion = "v2-worker-activation-20261117";
 const serviceWorkerFile =
 	window.CLASSROOM_SCRAMJET_VERSION === "v1" ? "sw-v1.js" : "sw.js";
 const stockSW = `./${serviceWorkerFile}?v=${serviceWorkerScriptVersion}`;
@@ -87,7 +87,7 @@ function waitForActiveWorker(registration, expectedScript) {
 	return new Promise((resolve, reject) => {
 		let timeout;
 		const observedWorkers = new Set();
-		const requestedSkipWaiting = new WeakSet();
+		const skipWaitingAttempts = new WeakMap();
 		const cleanup = () => {
 			window.clearTimeout(timeout);
 			registration.removeEventListener("updatefound", checkWorker);
@@ -120,13 +120,15 @@ function waitForActiveWorker(registration, expectedScript) {
 				}
 			}
 
-			const waitingWorker = registration.waiting || registration.installing;
-			if (
-				waitingWorker?.scriptURL === expectedScript &&
-				waitingWorker.state === "installed" &&
-				!requestedSkipWaiting.has(waitingWorker)
-			) {
-				requestedSkipWaiting.add(waitingWorker);
+			const waitingWorker = [
+				registration.waiting,
+				registration.installing,
+			].find((worker) => worker?.scriptURL === expectedScript);
+			const attempts = waitingWorker
+				? skipWaitingAttempts.get(waitingWorker) || 0
+				: 0;
+			if (waitingWorker?.state === "installed" && attempts < 2) {
+				skipWaitingAttempts.set(waitingWorker, attempts + 1);
 				try {
 					waitingWorker.postMessage({ type: "CLASSROOM_SKIP_WAITING" });
 				} catch (error) {
