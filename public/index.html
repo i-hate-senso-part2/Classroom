@@ -269,6 +269,21 @@
 							</svg>
 						</button>
 						<button
+							id="games-open"
+							class="icon-button"
+							type="button"
+							title="Games"
+							aria-label="Open games"
+							aria-pressed="false"
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									d="M7.5 8h9a4 4 0 0 1 3.8 5.2l-1 3.2a2 2 0 0 1-3.2 1L13 15h-2l-3.1 2.4a2 2 0 0 1-3.2-1l-1-3.2A4 4 0 0 1 7.5 8Z"
+								/>
+								<path d="M8 10.5v4m-2-2h4m6-1h.01M18 13h.01" />
+							</svg>
+						</button>
+						<button
 							id="user-settings-open"
 							class="icon-button"
 							type="button"
@@ -384,6 +399,142 @@
 							local laws.
 						</p>
 					</footer>
+				</section>
+				<section
+					id="games-screen"
+					class="games-screen"
+					aria-label="Games"
+					hidden
+				>
+					<div class="games-content">
+						<header class="games-header">
+							<div>
+								<span class="home-kicker">PLAY</span>
+								<h1>Games</h1>
+								<p>
+									Browse the GameDistribution catalog or jump into a game hub.
+								</p>
+							</div>
+							<button
+								id="games-home"
+								class="dialog-secondary"
+								type="button"
+								title="Return to home"
+							>
+								Back to home
+							</button>
+						</header>
+						<div class="game-providers" aria-label="Game providers">
+							<button
+								class="game-provider"
+								type="button"
+								data-game-url="https://selenite.cc/"
+							>
+								<span class="game-provider-icon" aria-hidden="true">S</span>
+								<span>
+									<strong>Selenite Games</strong>
+									<small>Open the Selenite games hub</small>
+								</span>
+								<svg
+									class="game-provider-arrow"
+									viewBox="0 0 24 24"
+									aria-hidden="true"
+								>
+									<path d="M7 17 17 7M8 7h9v9" />
+								</svg>
+							</button>
+							<button
+								class="game-provider"
+								type="button"
+								data-game-url="https://gamedistribution.com/games/"
+							>
+								<span class="game-provider-icon" aria-hidden="true">GD</span>
+								<span>
+									<strong>GameDistribution</strong>
+									<small>Browse the complete game catalog</small>
+								</span>
+								<svg
+									class="game-provider-arrow"
+									viewBox="0 0 24 24"
+									aria-hidden="true"
+								>
+									<path d="M7 17 17 7M8 7h9v9" />
+								</svg>
+							</button>
+							<button
+								class="game-provider"
+								type="button"
+								data-game-url="https://www.raccoongame.com/#/platform/cloudgame"
+							>
+								<span class="game-provider-icon" aria-hidden="true">R</span>
+								<span>
+									<strong>RacoonGaming</strong>
+									<small>Cloud gaming</small>
+								</span>
+								<svg
+									class="game-provider-arrow"
+									viewBox="0 0 24 24"
+									aria-hidden="true"
+								>
+									<path d="M7 17 17 7M8 7h9v9" />
+								</svg>
+							</button>
+						</div>
+						<section class="game-catalog" aria-labelledby="game-catalog-title">
+							<div class="game-catalog-heading">
+								<div>
+									<h2 id="game-catalog-title">GameDistribution games</h2>
+									<p id="games-status" aria-live="polite">Loading games…</p>
+								</div>
+								<button
+									id="games-refresh"
+									class="dialog-secondary"
+									type="button"
+								>
+									Refresh
+								</button>
+							</div>
+							<div class="game-filters">
+								<label class="game-search">
+									<svg viewBox="0 0 24 24" aria-hidden="true">
+										<circle cx="10.8" cy="10.8" r="6.3" />
+										<path d="m15.5 15.5 4 4" />
+									</svg>
+									<input
+										id="games-search"
+										type="search"
+										placeholder="Search games"
+										aria-label="Search games"
+									/>
+								</label>
+								<label class="game-filter">
+									<span>Category</span>
+									<select id="games-category" aria-label="Filter by category">
+										<option value="">All categories</option>
+									</select>
+								</label>
+								<label class="game-filter">
+									<span>Sort</span>
+									<select id="games-sort" aria-label="Sort games">
+										<option value="featured">Featured</option>
+										<option value="title-asc">Title (A-Z)</option>
+										<option value="title-desc">Title (Z-A)</option>
+										<option value="category">Category</option>
+									</select>
+								</label>
+							</div>
+							<p id="games-error" class="games-error" role="alert" hidden></p>
+							<div id="game-grid" class="game-grid" aria-live="polite"></div>
+							<p id="games-empty" class="games-empty" hidden>
+								No games match those filters.
+							</p>
+							<p class="game-catalog-note">
+								The list shows games available from GameDistribution's public
+								catalog feed. Use the provider link above to browse its full
+								catalog.
+							</p>
+						</section>
+					</div>
 				</section>
 				<div id="frame-host" class="frame-host"></div>
 				<div class="status-block" role="alert" aria-live="assertive" hidden>
@@ -507,9 +658,7 @@
 						</div>
 						<p>Manage site availability.</p>
 					</summary>
-					<p class="admin-help">
-						For mobile open <code>/?admin=1</code>.
-					</p>
+					<p class="admin-help">For mobile open <code>/?admin=1</code>.</p>
 					<label class="setting-row" for="blocked-toggle">
 						<span>
 							<strong>Block visitors</strong>
@@ -859,11 +1008,7 @@
 							<strong>Overlay with page color</strong>
 							<small>Turn this off to show the image without a tint.</small>
 						</span>
-						<input
-							id="background-image-overlay"
-							type="checkbox"
-							checked
-						/>
+						<input id="background-image-overlay" type="checkbox" checked />
 					</label>
 				</div>
 				<div id="background-video-controls" hidden>
@@ -882,15 +1027,17 @@
 							>No video selected</span
 						>
 					</div>
-					<label for="background-video-url">Or paste a direct MP4/WebM URL</label>
+					<label for="background-video-url"
+						>Or paste a direct MP4/WebM URL</label
+					>
 					<input
 						id="background-video-url"
 						type="url"
 						placeholder="https://example.com/background.mp4"
 					/>
 					<small class="theme-help">
-						Videos play muted and loop. Uploaded videos up to 50 MB stay in
-						this browser.
+						Videos play muted and loop. Uploaded videos up to 50 MB stay in this
+						browser.
 					</small>
 				</div>
 				<button
@@ -920,6 +1067,41 @@
 					aria-live="polite"
 				></p>
 			</form>
+			<section class="backup-section" aria-labelledby="backup-title">
+				<h3 id="backup-title">Local backup</h3>
+				<p>
+					Export settings, bookmarks, theme media, and Scramjet V1/V2 proxy
+					cookies. The encrypted file stays on this device. Keep it and your
+					passphrase private; restoring cookies may restore signed-in sessions.
+				</p>
+				<label for="backup-passphrase">Backup passphrase</label>
+				<input
+					id="backup-passphrase"
+					type="password"
+					autocomplete="new-password"
+					minlength="12"
+					placeholder="At least 12 characters"
+				/>
+				<div class="backup-actions">
+					<button id="backup-export" class="dialog-secondary" type="button">
+						Export encrypted backup
+					</button>
+					<button
+						id="backup-import-button"
+						class="dialog-secondary"
+						type="button"
+					>
+						Import backup
+					</button>
+					<input
+						id="backup-import-file"
+						type="file"
+						accept="application/json,.json"
+						hidden
+					/>
+				</div>
+				<p id="backup-message" class="dialog-message" aria-live="polite"></p>
+			</section>
 		</dialog>
 		<section
 			id="blocked-overlay"

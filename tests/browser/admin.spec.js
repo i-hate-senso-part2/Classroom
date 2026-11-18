@@ -111,6 +111,164 @@ test("GeForce NOW and TikTok quick links stay inside the proxy", async ({
 	}
 });
 
+test("games page loads and filters the GameDistribution catalog", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.route("https://catalog.api.gamedistribution.com/**", (route) =>
+		route.fulfill({
+			contentType: "application/json",
+			body: JSON.stringify([
+				{
+					Title: "Puzzle Harbor",
+					Description: "A relaxing puzzle game",
+					Url: "https://html5.gamedistribution.com/puzzle/",
+					Asset: ["https://img.gamedistribution.com/puzzle.jpg"],
+					Category: ["Puzzle"],
+					Tag: ["relaxing"],
+				},
+				{
+					Title: "Racing Dash",
+					Description: "A quick racing game",
+					Url: "https://html5.gamedistribution.com/racing/",
+					Asset: ["https://img.gamedistribution.com/racing.jpg"],
+					Category: ["Racing"],
+					Tag: ["cars"],
+				},
+			]),
+		})
+	);
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "Open games" }).click();
+	await expect(page.locator("#games-screen")).toBeVisible();
+	await expect(
+		page.locator(
+			'.game-provider[data-game-url="https://www.raccoongame.com/#/platform/cloudgame"]'
+		)
+	).toHaveCount(1);
+	await expect(page.locator(".game-card")).toHaveCount(2);
+	await expect(page.locator("#games-category option")).toHaveCount(3);
+
+	await page.locator("#games-search").fill("puzzle");
+	await expect(page.locator(".game-card")).toHaveCount(1);
+	await expect(page.locator(".game-card")).toContainText("Puzzle Harbor");
+	await page.locator("#games-search").fill("");
+	await page.locator("#games-sort").selectOption("title-desc");
+	await expect(page.locator(".game-card").first()).toContainText("Racing Dash");
+	await page.getByRole("button", { name: "Back to home" }).click();
+	await expect(page.locator("#games-screen")).toBeHidden();
+	await expect(page.locator("#home-screen")).toBeVisible();
+});
+
+test("encrypted local backup restores Classroom preferences and proxy cookies", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+	await page.evaluate(async () => {
+		localStorage.setItem(
+			"classroom-bookmarks",
+			JSON.stringify([{ label: "Saved", url: "https://saved.example/" }])
+		);
+		const openDatabase = (name, version, storeNames) =>
+			new Promise((resolve, reject) => {
+				const request = indexedDB.open(name, version);
+				request.onupgradeneeded = () => {
+					for (const storeName of storeNames) {
+						if (!request.result.objectStoreNames.contains(storeName)) {
+							request.result.createObjectStore(storeName);
+						}
+					}
+				};
+				request.onsuccess = () => resolve(request.result);
+				request.onerror = () => reject(request.error);
+			});
+		const v1 = await openDatabase("$classroom-scramjet-v1", 3, [
+			"config",
+			"cookies",
+			"redirectTrackers",
+			"referrerPolicies",
+			"publicSuffixList",
+		]);
+		v1.transaction("cookies", "readwrite")
+			.objectStore("cookies")
+			.put("v1-session", "test-session");
+		v1.close();
+		const v2 = await openDatabase("__scramjet_controller", 1, ["state"]);
+		v2.transaction("state", "readwrite")
+			.objectStore("state")
+			.put({ updatedAt: 123, cookies: "[]" }, "cookies");
+		v2.close();
+	});
+
+	await page.getByRole("button", { name: "User settings" }).click();
+	await page.locator("#backup-passphrase").fill("correct horse battery");
+	const downloadPromise = page.waitForEvent("download");
+	await page.getByRole("button", { name: "Export encrypted backup" }).click();
+	const download = await downloadPromise;
+	const encryptedBackup = JSON.parse(
+		readFileSync(await download.path(), "utf8")
+	);
+	expect(encryptedBackup).toMatchObject({
+		format: "classroom-encrypted-backup",
+		cipher: "AES-256-GCM",
+	});
+	expect(encryptedBackup.data).not.toContain("v1-session");
+
+	await page.evaluate(() => {
+		localStorage.setItem("classroom-bookmarks", "[]");
+	});
+	page.on("dialog", (dialog) => dialog.accept());
+	const reload = page.waitForNavigation();
+	await page.locator("#backup-import-file").setInputFiles({
+		name: "classroom-backup.json",
+		mimeType: "application/json",
+		buffer: Buffer.from(JSON.stringify(encryptedBackup)),
+	});
+	await reload;
+
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				JSON.parse(localStorage.getItem("classroom-bookmarks") || "[]")
+			)
+		)
+		.toEqual([{ label: "Saved", url: "https://saved.example/" }]);
+	const restoredCookies = await page.evaluate(async () => {
+		const openDatabase = (name) =>
+			new Promise((resolve, reject) => {
+				const request = indexedDB.open(name);
+				request.onsuccess = () => resolve(request.result);
+				request.onerror = () => reject(request.error);
+			});
+		const v1 = await openDatabase("$classroom-scramjet-v1");
+		const v1Value = await new Promise((resolve, reject) => {
+			const request = v1
+				.transaction("cookies")
+				.objectStore("cookies")
+				.get("test-session");
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+		v1.close();
+		const v2 = await openDatabase("__scramjet_controller");
+		const v2Value = await new Promise((resolve, reject) => {
+			const request = v2
+				.transaction("state")
+				.objectStore("state")
+				.get("cookies");
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+		v2.close();
+		return { v1Value, v2Value };
+	});
+	expect(restoredCookies).toEqual({
+		v1Value: "v1-session",
+		v2Value: { updatedAt: 123, cookies: "[]" },
+	});
+});
+
 test("V1 DuckDuckGo searches use the lightweight results page", async ({
 	page,
 }) => {

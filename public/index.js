@@ -51,6 +51,8 @@ const errorSource = document.getElementById("sj-error-source");
 const tabList = document.getElementById("tab-list");
 const frameHost = document.getElementById("frame-host");
 const homeScreen = document.getElementById("home-screen");
+const gamesScreen = document.getElementById("games-screen");
+const gameGrid = document.getElementById("game-grid");
 const progress = document.getElementById("browser-progress");
 const quickLinks = document.getElementById("quick-links");
 const startupScreen = document.getElementById("startup-screen");
@@ -174,6 +176,8 @@ let bookmarks = [];
 let sharedLinks = [];
 let sharedLinksHistory = [];
 let renderedSharedLinks = "";
+let gameCatalog = [];
+let gameCatalogLoading = false;
 let arrowSequenceIndex = 0;
 const arrowSequence = ["ArrowUp", "ArrowDown", "ArrowUp", "ArrowDown"];
 
@@ -712,7 +716,11 @@ function syncBrowser() {
 		if (current.frame)
 			current.frame.element.hidden = current.id !== activeTabId || current.home;
 	}
-	homeScreen.hidden = !tab.home;
+	homeScreen.hidden = !tab.home || tab.games === true;
+	gamesScreen.hidden = tab.games !== true;
+	document
+		.getElementById("games-open")
+		.setAttribute("aria-pressed", String(tab.games === true));
 	address.value = tab.home ? "" : tab.url;
 	document.getElementById("go-back").disabled =
 		!tab.frame || tab.historyIndex <= 0;
@@ -727,7 +735,8 @@ function syncBrowser() {
 	bookmarkButton.setAttribute("aria-pressed", String(saved));
 	bookmarkButton.disabled = tab.home;
 	const cloak = cloakTemplates.find((item) => item.id === tab.cloak);
-	document.title = cloak?.title || (tab.home ? "New tab" : tab.title);
+	document.title =
+		cloak?.title || (tab.games ? "Games" : tab.home ? "New tab" : tab.title);
 	document.getElementById("browser-favicon").href = cloak?.logo || "/sj.png";
 	if (tab.frame) tab.frame.element.title = tab.title;
 	renderTabs();
@@ -879,6 +888,473 @@ async function saveUserSettings(settings) {
 		}
 	}
 	return true;
+}
+
+function bytesToBase64(bytes) {
+	let binary = "";
+	for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+		binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+	}
+	return btoa(binary);
+}
+
+function base64ToBytes(value) {
+	const binary = atob(value);
+	return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function encodeBackupValue(value, seen = new WeakSet()) {
+	if (value instanceof Blob) {
+		return {
+			__classroomBackupType: "Blob",
+			type: value.type,
+			data: bytesToBase64(new Uint8Array(await value.arrayBuffer())),
+		};
+	}
+	if (value instanceof Date) {
+		return { __classroomBackupType: "Date", value: value.toISOString() };
+	}
+	if (value instanceof ArrayBuffer) {
+		return {
+			__classroomBackupType: "ArrayBuffer",
+			data: bytesToBase64(new Uint8Array(value)),
+		};
+	}
+	if (ArrayBuffer.isView(value)) {
+		return {
+			__classroomBackupType: value.constructor.name,
+			data: bytesToBase64(
+				new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+			),
+		};
+	}
+	if (Array.isArray(value)) {
+		const items = [];
+		for (const item of value) items.push(await encodeBackupValue(item, seen));
+		return items;
+	}
+	if (value && typeof value === "object") {
+		if (seen.has(value)) {
+			throw new Error("A circular value cannot be included in this backup.");
+		}
+		seen.add(value);
+		const entries = [];
+		for (const [key, item] of Object.entries(value)) {
+			entries.push([key, await encodeBackupValue(item, seen)]);
+		}
+		seen.delete(value);
+		return Object.fromEntries(entries);
+	}
+	return value;
+}
+
+function decodeBackupValue(value) {
+	if (Array.isArray(value)) return value.map(decodeBackupValue);
+	if (!value || typeof value !== "object") return value;
+	const type = value.__classroomBackupType;
+	if (type === "Blob") {
+		return new Blob([base64ToBytes(value.data)], { type: value.type || "" });
+	}
+	if (type === "Date") return new Date(value.value);
+	if (type === "ArrayBuffer") {
+		return base64ToBytes(value.data).buffer;
+	}
+	if (type && value.data) {
+		const bytes = base64ToBytes(value.data);
+		const viewType = globalThis[type];
+		if (typeof viewType === "function" && viewType.BYTES_PER_ELEMENT) {
+			return new viewType(
+				bytes.buffer,
+				bytes.byteOffset,
+				Math.floor(bytes.byteLength / viewType.BYTES_PER_ELEMENT)
+			);
+		}
+	}
+	return Object.fromEntries(
+		Object.entries(value).map(([key, item]) => [key, decodeBackupValue(item)])
+	);
+}
+
+function openBackupDatabase(name, version, stores) {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(name, version);
+		request.addEventListener("upgradeneeded", () => {
+			for (const store of stores) {
+				if (!request.result.objectStoreNames.contains(store)) {
+					request.result.createObjectStore(store);
+				}
+			}
+		});
+		request.addEventListener("success", () => resolve(request.result), {
+			once: true,
+		});
+		request.addEventListener(
+			"error",
+			() =>
+				reject(
+					request.error ||
+						new Error(`Could not open the local ${name} database.`)
+				),
+			{ once: true }
+		);
+		request.addEventListener(
+			"blocked",
+			() =>
+				reject(
+					new Error(`Close other Classroom tabs before backing up ${name}.`)
+				),
+			{ once: true }
+		);
+	});
+}
+
+function requestAsPromise(request) {
+	return new Promise((resolve, reject) => {
+		request.addEventListener("success", () => resolve(request.result), {
+			once: true,
+		});
+		request.addEventListener(
+			"error",
+			() => reject(request.error || new Error("IndexedDB request failed.")),
+			{ once: true }
+		);
+	});
+}
+
+function transactionAsPromise(transaction) {
+	return new Promise((resolve, reject) => {
+		transaction.addEventListener("complete", resolve, { once: true });
+		transaction.addEventListener(
+			"abort",
+			() =>
+				reject(
+					transaction.error || new Error("IndexedDB transaction aborted.")
+				),
+			{ once: true }
+		);
+		transaction.addEventListener(
+			"error",
+			() =>
+				reject(transaction.error || new Error("IndexedDB transaction failed.")),
+			{ once: true }
+		);
+	});
+}
+
+async function readBackupStore(databaseName, version, stores, storeName) {
+	const database = await openBackupDatabase(databaseName, version, stores);
+	try {
+		const transaction = database.transaction(storeName, "readonly");
+		const finished = transactionAsPromise(transaction);
+		const store = transaction.objectStore(storeName);
+		const [keys, values] = await Promise.all([
+			requestAsPromise(store.getAllKeys()),
+			requestAsPromise(store.getAll()),
+			finished,
+		]);
+		return Promise.all(
+			keys.map(async (key, index) => ({
+				key: await encodeBackupValue(key),
+				value: await encodeBackupValue(values[index]),
+			}))
+		);
+	} finally {
+		database.close();
+	}
+}
+
+async function writeBackupStore(
+	databaseName,
+	version,
+	stores,
+	storeName,
+	records
+) {
+	const database = await openBackupDatabase(databaseName, version, stores);
+	try {
+		const transaction = database.transaction(storeName, "readwrite");
+		const finished = transactionAsPromise(transaction);
+		const store = transaction.objectStore(storeName);
+		store.clear();
+		for (const record of records) {
+			store.put(decodeBackupValue(record.value), decodeBackupValue(record.key));
+		}
+		await finished;
+	} finally {
+		database.close();
+	}
+}
+
+const backupDatabases = Object.freeze({
+	v1: {
+		name: "$classroom-scramjet-v1",
+		version: 3,
+		stores: [
+			"config",
+			"cookies",
+			"redirectTrackers",
+			"referrerPolicies",
+			"publicSuffixList",
+		],
+		store: "cookies",
+	},
+	v2: {
+		name: "__scramjet_controller",
+		version: 1,
+		stores: ["state"],
+		store: "state",
+	},
+	theme: {
+		name: THEME_ASSET_DB_NAME,
+		version: 1,
+		stores: [THEME_ASSET_STORE],
+		store: THEME_ASSET_STORE,
+	},
+});
+
+async function createLocalBackup() {
+	const localStorageData = {};
+	for (let index = 0; index < localStorage.length; index++) {
+		const key = localStorage.key(index);
+		if (key?.startsWith("classroom-")) {
+			localStorageData[key] = localStorage.getItem(key);
+		}
+	}
+	const [v1Cookies, v2Cookies, themeVideos] = await Promise.all([
+		readBackupStore(
+			backupDatabases.v1.name,
+			backupDatabases.v1.version,
+			backupDatabases.v1.stores,
+			backupDatabases.v1.store
+		),
+		readBackupStore(
+			backupDatabases.v2.name,
+			backupDatabases.v2.version,
+			backupDatabases.v2.stores,
+			backupDatabases.v2.store
+		),
+		readBackupStore(
+			backupDatabases.theme.name,
+			backupDatabases.theme.version,
+			backupDatabases.theme.stores,
+			backupDatabases.theme.store
+		),
+	]);
+	return {
+		format: "classroom-local-backup",
+		version: 1,
+		createdAt: new Date().toISOString(),
+		localStorage: localStorageData,
+		proxyCookies: { v1: v1Cookies, v2: v2Cookies },
+		themeVideos,
+	};
+}
+
+async function deriveBackupKey(passphrase, salt) {
+	const material = await crypto.subtle.importKey(
+		"raw",
+		new TextEncoder().encode(passphrase),
+		"PBKDF2",
+		false,
+		["deriveKey"]
+	);
+	return crypto.subtle.deriveKey(
+		{ name: "PBKDF2", salt, iterations: 310000, hash: "SHA-256" },
+		material,
+		{ name: "AES-GCM", length: 256 },
+		false,
+		["encrypt", "decrypt"]
+	);
+}
+
+async function encryptLocalBackup(backup, passphrase) {
+	if (!crypto.subtle) {
+		throw new Error(
+			"Encrypted backups require HTTPS or a secure local connection."
+		);
+	}
+	const salt = crypto.getRandomValues(new Uint8Array(16));
+	const iv = crypto.getRandomValues(new Uint8Array(12));
+	const key = await deriveBackupKey(passphrase, salt);
+	const encrypted = await crypto.subtle.encrypt(
+		{ name: "AES-GCM", iv },
+		key,
+		new TextEncoder().encode(JSON.stringify(backup))
+	);
+	return {
+		format: "classroom-encrypted-backup",
+		version: 1,
+		kdf: "PBKDF2-SHA-256",
+		iterations: 310000,
+		cipher: "AES-256-GCM",
+		salt: bytesToBase64(salt),
+		iv: bytesToBase64(iv),
+		data: bytesToBase64(new Uint8Array(encrypted)),
+	};
+}
+
+async function decryptLocalBackup(envelope, passphrase) {
+	if (
+		!crypto.subtle ||
+		envelope?.format !== "classroom-encrypted-backup" ||
+		envelope.version !== 1 ||
+		envelope.kdf !== "PBKDF2-SHA-256" ||
+		envelope.iterations !== 310000 ||
+		envelope.cipher !== "AES-256-GCM" ||
+		typeof envelope.salt !== "string" ||
+		typeof envelope.iv !== "string" ||
+		typeof envelope.data !== "string"
+	) {
+		throw new Error("This is not a supported Classroom encrypted backup.");
+	}
+	const key = await deriveBackupKey(passphrase, base64ToBytes(envelope.salt));
+	try {
+		const decrypted = await crypto.subtle.decrypt(
+			{ name: "AES-GCM", iv: base64ToBytes(envelope.iv) },
+			key,
+			base64ToBytes(envelope.data)
+		);
+		return JSON.parse(new TextDecoder().decode(decrypted));
+	} catch {
+		throw new Error(
+			"The passphrase is incorrect or the backup file is damaged."
+		);
+	}
+}
+
+function validateLocalBackup(backup) {
+	if (
+		backup?.format !== "classroom-local-backup" ||
+		backup.version !== 1 ||
+		!backup.localStorage ||
+		typeof backup.localStorage !== "object" ||
+		Array.isArray(backup.localStorage) ||
+		!backup.proxyCookies ||
+		!Array.isArray(backup.proxyCookies.v1) ||
+		!Array.isArray(backup.proxyCookies.v2) ||
+		!Array.isArray(backup.themeVideos)
+	) {
+		throw new Error(
+			"The decrypted file does not contain a valid Classroom backup."
+		);
+	}
+	if (
+		Object.entries(backup.localStorage).some(
+			([key]) => !key.startsWith("classroom-")
+		) ||
+		Object.values(backup.localStorage).some(
+			(value) => typeof value !== "string"
+		)
+	) {
+		throw new Error("The backup contains invalid local settings.");
+	}
+	for (const records of [
+		backup.proxyCookies.v1,
+		backup.proxyCookies.v2,
+		backup.themeVideos,
+	]) {
+		if (
+			records.some(
+				(record) =>
+					!record ||
+					typeof record !== "object" ||
+					!("key" in record) ||
+					!("value" in record)
+			)
+		) {
+			throw new Error("The backup contains invalid local database data.");
+		}
+	}
+}
+
+function backupPassphrase() {
+	const passphrase = document.getElementById("backup-passphrase").value;
+	if (passphrase.length < 12) {
+		throw new Error("Choose a passphrase with at least 12 characters.");
+	}
+	return passphrase;
+}
+
+function showBackupMessage(message, isError = false) {
+	const element = document.getElementById("backup-message");
+	element.textContent = message;
+	element.classList.toggle("error", isError);
+}
+
+async function exportLocalBackup() {
+	const button = document.getElementById("backup-export");
+	button.disabled = true;
+	try {
+		const passphrase = backupPassphrase();
+		const backup = await createLocalBackup();
+		const encrypted = await encryptLocalBackup(backup, passphrase);
+		const blob = new Blob([JSON.stringify(encrypted, null, 2)], {
+			type: "application/json",
+		});
+		const downloadUrl = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.href = downloadUrl;
+		link.download = `classroom-backup-${new Date().toISOString().slice(0, 10)}.json`;
+		link.click();
+		window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+		showBackupMessage("Encrypted backup downloaded to this device.");
+	} catch (error) {
+		showBackupMessage(`Backup export failed: ${error.message}`, true);
+	} finally {
+		button.disabled = false;
+	}
+}
+
+async function importLocalBackup(file) {
+	if (!file) return;
+	try {
+		if (file.size > 100 * 1024 * 1024) {
+			throw new Error("Choose a backup file smaller than 100 MB.");
+		}
+		const passphrase = backupPassphrase();
+		const encrypted = JSON.parse(await file.text());
+		const backup = await decryptLocalBackup(encrypted, passphrase);
+		validateLocalBackup(backup);
+		if (
+			!window.confirm(
+				"Restore this backup on this device? Matching Classroom settings and proxy cookies will be replaced. The page will reload."
+			)
+		) {
+			return;
+		}
+		await Promise.all([
+			writeBackupStore(
+				backupDatabases.v1.name,
+				backupDatabases.v1.version,
+				backupDatabases.v1.stores,
+				backupDatabases.v1.store,
+				backup.proxyCookies.v1
+			),
+			writeBackupStore(
+				backupDatabases.v2.name,
+				backupDatabases.v2.version,
+				backupDatabases.v2.stores,
+				backupDatabases.v2.store,
+				backup.proxyCookies.v2
+			),
+			writeBackupStore(
+				backupDatabases.theme.name,
+				backupDatabases.theme.version,
+				backupDatabases.theme.stores,
+				backupDatabases.theme.store,
+				backup.themeVideos
+			),
+		]);
+		for (const [key, value] of Object.entries(backup.localStorage)) {
+			localStorage.setItem(key, value);
+		}
+		showBackupMessage("Backup restored. Reloading…");
+		window.location.reload();
+	} catch (error) {
+		showBackupMessage(`Backup import failed: ${error.message}`, true);
+	} finally {
+		document.getElementById("backup-import-file").value = "";
+	}
 }
 
 function readSettingsForm() {
@@ -1548,6 +2024,161 @@ function filterQuickLinks() {
 		visibleCount > 0 || !query;
 }
 
+function getVisibleGames() {
+	const query = document
+		.getElementById("games-search")
+		.value.trim()
+		.toLocaleLowerCase();
+	const category = document.getElementById("games-category").value;
+	const sort = document.getElementById("games-sort").value;
+	const games = gameCatalog.filter((game) => {
+		const matchesCategory = !category || game.Category.includes(category);
+		const matchesQuery =
+			!query ||
+			`${game.Title} ${game.Description} ${game.Category.join(" ")} ${game.Tag.join(" ")}`
+				.toLocaleLowerCase()
+				.includes(query);
+		return matchesCategory && matchesQuery;
+	});
+	if (sort === "title-asc") {
+		games.sort((a, b) => a.Title.localeCompare(b.Title));
+	} else if (sort === "title-desc") {
+		games.sort((a, b) => b.Title.localeCompare(a.Title));
+	} else if (sort === "category") {
+		games.sort(
+			(a, b) =>
+				(a.Category[0] || "").localeCompare(b.Category[0] || "") ||
+				a.Title.localeCompare(b.Title)
+		);
+	}
+	return games;
+}
+
+function renderGames() {
+	const games = getVisibleGames();
+	gameGrid.replaceChildren();
+	for (const game of games) {
+		const card = document.createElement("button");
+		card.type = "button";
+		card.className = "game-card";
+		card.dataset.gameUrl = game.Url;
+		card.setAttribute("aria-label", `Play ${game.Title}`);
+		const image = document.createElement("img");
+		image.src = game.Asset[0];
+		image.alt = "";
+		image.loading = "lazy";
+		image.referrerPolicy = "no-referrer";
+		const copy = document.createElement("span");
+		copy.className = "game-card-copy";
+		const title = document.createElement("strong");
+		title.textContent = game.Title;
+		const category = document.createElement("small");
+		category.textContent = game.Category.join(" / ") || "GameDistribution";
+		copy.append(title, category);
+		card.append(image, copy);
+		gameGrid.append(card);
+	}
+	document.getElementById("games-empty").hidden = games.length > 0;
+	if (gameCatalog.length) {
+		document.getElementById("games-status").textContent =
+			`Showing ${games.length} of ${gameCatalog.length} catalog games`;
+	}
+}
+
+async function loadGameCatalog(force = false) {
+	if (gameCatalogLoading || (gameCatalog.length && !force)) return;
+	gameCatalogLoading = true;
+	const status = document.getElementById("games-status");
+	const errorMessage = document.getElementById("games-error");
+	errorMessage.hidden = true;
+	status.textContent = "Loading GameDistribution games…";
+	const controller = new AbortController();
+	const timeout = window.setTimeout(() => controller.abort(), 20000);
+	try {
+		const params = new URLSearchParams({
+			collection: "all",
+			categories: "",
+			tags: "",
+			subType: "",
+			mobile: "all",
+			rewarded: "all",
+			high: "all",
+			n: "100",
+			p: "1",
+		});
+		const response = await fetch(
+			`https://catalog.api.gamedistribution.com/api/v2.0/rss/All/?${params}`,
+			{ signal: controller.signal }
+		);
+		if (!response.ok) {
+			throw new Error(`Catalog request failed (${response.status}).`);
+		}
+		const data = await response.json();
+		if (!Array.isArray(data)) {
+			throw new Error(
+				"The GameDistribution catalog returned an invalid response."
+			);
+		}
+		gameCatalog = data
+			.filter(
+				(game) =>
+					typeof game?.Title === "string" &&
+					typeof game?.Url === "string" &&
+					/^https:\/\/html5\.gamedistribution\.com\//.test(game.Url) &&
+					Array.isArray(game.Asset) &&
+					typeof game.Asset[0] === "string" &&
+					/^https:\/\/img\.gamedistribution\.com\//.test(game.Asset[0])
+			)
+			.map((game) => ({
+				Title: game.Title,
+				Description:
+					typeof game.Description === "string" ? game.Description : "",
+				Url: game.Url,
+				Asset: game.Asset,
+				Category: Array.isArray(game.Category)
+					? game.Category.filter((value) => typeof value === "string")
+					: [],
+				Tag: Array.isArray(game.Tag)
+					? game.Tag.filter((value) => typeof value === "string")
+					: [],
+			}));
+		const categories = [
+			...new Set(gameCatalog.flatMap((game) => game.Category)),
+		].sort((a, b) => a.localeCompare(b));
+		const categorySelect = document.getElementById("games-category");
+		categorySelect.replaceChildren(new Option("All categories", ""));
+		for (const category of categories) {
+			categorySelect.add(new Option(category, category));
+		}
+		if (!gameCatalog.length) {
+			throw new Error("No playable games were found in the catalog response.");
+		}
+		renderGames();
+	} catch (error) {
+		const detail =
+			error.name === "AbortError"
+				? "The catalog request timed out. Check your connection and try again."
+				: error.message;
+		status.textContent = "Game catalog unavailable";
+		errorMessage.textContent = detail;
+		errorMessage.hidden = false;
+	} finally {
+		window.clearTimeout(timeout);
+		gameCatalogLoading = false;
+	}
+}
+
+function showGamesPage() {
+	const tab = activeTab();
+	if (!tab) return;
+	tab.home = true;
+	tab.games = true;
+	setLoading(false);
+	showError("");
+	syncBrowser();
+	void loadGameCatalog();
+}
+
 function getErrorLog(error, seen = new Set()) {
 	if (!(error instanceof Error)) return String(error);
 	if (seen.has(error)) return "[Circular error cause]";
@@ -1872,6 +2503,7 @@ function updateTabUrl(tab, url) {
 		}
 	}
 	tab.home = false;
+	tab.games = false;
 	tab.url = url;
 	try {
 		tab.title = new URL(url).hostname.replace(/^www\./, "") || "New tab";
@@ -2084,6 +2716,7 @@ async function navigateTab(tab, url) {
 	try {
 		await prepareTransport();
 		tab.home = false;
+		tab.games = false;
 		updateTabUrl(tab, url);
 		const frame = createFrame(tab);
 		frame.element.hidden = tab.id !== activeTabId;
@@ -2134,6 +2767,7 @@ function createTab() {
 			userSettings.defaultCloak === "normal" ? null : userSettings.defaultCloak,
 		url: "",
 		home: true,
+		games: false,
 		frame: null,
 		history: [],
 		historyIndex: -1,
@@ -2167,6 +2801,7 @@ function goHome() {
 	window.clearTimeout(tab.navigationTimer);
 	tab.navigationTimer = null;
 	tab.home = true;
+	tab.games = false;
 	tab.title = "New tab";
 	tab.favicon = null;
 	setLoading(false);
@@ -2261,6 +2896,28 @@ tabList.addEventListener("click", (event) => {
 });
 
 document.getElementById("new-tab").addEventListener("click", createTab);
+document.getElementById("games-open").addEventListener("click", showGamesPage);
+document.getElementById("games-home").addEventListener("click", goHome);
+document.querySelector(".game-providers").addEventListener("click", (event) => {
+	const provider = event.target.closest("[data-game-url]");
+	if (!provider) return;
+	const url = safeMediaUrl(provider.dataset.gameUrl);
+	if (url) void navigateTab(activeTab(), url);
+});
+gameGrid.addEventListener("click", (event) => {
+	const card = event.target.closest("[data-game-url]");
+	if (!card) return;
+	const url = safeMediaUrl(card.dataset.gameUrl);
+	if (url) void navigateTab(activeTab(), url);
+});
+document.getElementById("games-search").addEventListener("input", renderGames);
+document
+	.getElementById("games-category")
+	.addEventListener("change", renderGames);
+document.getElementById("games-sort").addEventListener("change", renderGames);
+document
+	.getElementById("games-refresh")
+	.addEventListener("click", () => void loadGameCatalog(true));
 document
 	.getElementById("go-back")
 	.addEventListener("click", () => activeTab()?.frame?.back());
@@ -2278,6 +2935,19 @@ document
 document
 	.getElementById("user-settings-open")
 	.addEventListener("click", openUserSettings);
+document
+	.getElementById("backup-export")
+	.addEventListener("click", () => void exportLocalBackup());
+document
+	.getElementById("backup-import-button")
+	.addEventListener("click", () => {
+		document.getElementById("backup-import-file").click();
+	});
+document
+	.getElementById("backup-import-file")
+	.addEventListener("change", (event) => {
+		void importLocalBackup(event.target.files[0]);
+	});
 document
 	.getElementById("user-settings-close")
 	.addEventListener("click", () => {
