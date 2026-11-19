@@ -3,6 +3,12 @@
 	// reachable endpoint and continues through this list if a connection fails.
 	const publicWispEndpoints = Object.freeze([
 		"wss://wisp-server-python-nh0a.onrender.com/",
+		"wss://wisp-server-python-n7ip.onrender.com/",
+		"wss://wisp-server-python-b4vv.onrender.com/",
+		"wss://wisp-server-python-rdsh.onrender.com/",
+		"wss://wisp-server-python-2y2s.onrender.com/",
+		"wss://wisp-server-python-nez7.onrender.com/",
+		""
 	]);
 
 	let endpointCursor = -1;

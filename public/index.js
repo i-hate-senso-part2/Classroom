@@ -2750,7 +2750,7 @@ async function navigateTab(tab, url) {
 			error: err,
 		});
 		showError(
-			"Unable to open this page.",
+			"Unable to open this page. - If you recently opened this website, please wait around 1-2 minutes and try again.",
 			err instanceof Error ? err.message : String(err),
 			getErrorLog(err),
 			classifySetupError(err)
