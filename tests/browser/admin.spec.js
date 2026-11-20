@@ -69,6 +69,13 @@ async function useReturningUserSettings(page, settings = returningUserSettings) 
 	}, settings);
 }
 
+async function openSettingsSection(page, title) {
+	await page
+		.locator("#user-settings-dialog .settings-section > summary")
+		.filter({ hasText: title })
+		.click();
+}
+
 test.beforeAll(async () => {
 	dataDirectory = mkdtempSync(join(tmpdir(), "classroom-browser-test-"));
 	const salt = randomBytes(16);
@@ -147,6 +154,35 @@ test("games page loads and filters the GameDistribution catalog", async ({
 		)
 	).toHaveCount(1);
 	await expect(page.locator(".game-card")).toHaveCount(2);
+	await expect(page.locator(".game-card img")).toHaveCount(2);
+	await expect(page.locator(".game-card img").first()).toHaveAttribute(
+		"src",
+		"https://img.gamedistribution.com/puzzle.jpg"
+	);
+	await expect(page.locator(".game-card img").first()).toHaveAttribute(
+		"crossorigin",
+		"anonymous"
+	);
+	await expect(page.locator(".game-provider-favicon img")).toHaveCount(3);
+	await expect(page.locator(".game-provider-favicon img").first()).toHaveAttribute(
+		"src",
+		"https://selenite.cc/favicon.ico"
+	);
+	await expect(
+		page.locator(".game-provider-favicon img").first()
+	).toHaveAttribute("crossorigin", "anonymous");
+	await expect(page.locator(".game-provider-favicon img").nth(1)).toHaveAttribute(
+		"src",
+		"https://gamedistribution.com/favicon.ico"
+	);
+	await expect(page.locator(".game-provider-favicon img").nth(2)).toHaveAttribute(
+		"src",
+		"https://www.raccoongame.com/favicon.ico"
+	);
+	await expect(page.locator(".game-provider-favicon img").first()).toHaveAttribute(
+		"loading",
+		"lazy"
+	);
 	await expect(page.locator("#games-category option")).toHaveCount(3);
 
 	await page.locator("#games-search").fill("puzzle");
@@ -158,6 +194,232 @@ test("games page loads and filters the GameDistribution catalog", async ({
 	await page.getByRole("button", { name: "Back to home" }).click();
 	await expect(page.locator("#games-screen")).toBeHidden();
 	await expect(page.locator("#home-screen")).toBeVisible();
+});
+
+test("theme particle network responds to the pointer and respects reduced motion", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+	await expect
+		.poll(() =>
+			page.locator("#home-screen .theme-particles").evaluate((canvas) => {
+				if (!canvas.width || !canvas.height) return 0;
+				const pixels = canvas
+					.getContext("2d")
+					.getImageData(0, 0, canvas.width, canvas.height).data;
+				let alpha = 0;
+				for (let index = 3; index < pixels.length; index += 4) {
+					alpha += pixels[index];
+				}
+				return alpha;
+			})
+		)
+		.toBeGreaterThan(0);
+	await page.emulateMedia({ reducedMotion: "reduce" });
+	const initialIntensity = await page
+		.locator("#home-screen .theme-particles")
+		.evaluate((canvas) => {
+			const pixels = canvas
+				.getContext("2d")
+				.getImageData(0, 0, canvas.width, canvas.height).data;
+			let alpha = 0;
+			for (let index = 3; index < pixels.length; index += 4) {
+				alpha += pixels[index];
+			}
+			return alpha;
+		});
+	await page.evaluate(() => {
+		const stage = document.getElementById("browser-stage");
+		const bounds = stage.getBoundingClientRect();
+		stage.dispatchEvent(
+			new PointerEvent("pointermove", {
+				clientX: bounds.left + bounds.width / 2 + 120,
+				clientY: bounds.top + bounds.height / 2 + 80,
+				pointerType: "mouse",
+				bubbles: true,
+			})
+		);
+	});
+	await expect
+		.poll(() =>
+			page.locator("#home-screen .theme-particles").evaluate((canvas) => {
+				if (!canvas.width || !canvas.height) return false;
+				const pixels = canvas
+					.getContext("2d")
+					.getImageData(0, 0, canvas.width, canvas.height).data;
+				for (let index = 3; index < pixels.length; index += 4) {
+					if (pixels[index]) return true;
+				}
+				return false;
+			})
+		)
+		.not.toBe(initialIntensity);
+	await expect(page.locator("#browser-stage")).not.toHaveClass(/has-pointer/);
+	await page.emulateMedia({ reducedMotion: "no-preference" });
+	await page.evaluate(() => {
+		const stage = document.getElementById("browser-stage");
+		const bounds = stage.getBoundingClientRect();
+		stage.dispatchEvent(
+			new PointerEvent("pointermove", {
+				clientX: bounds.left + bounds.width / 2 + 120,
+				clientY: bounds.top + bounds.height / 2 + 80,
+				pointerType: "mouse",
+				bubbles: true,
+			})
+		);
+	});
+	await expect(page.locator("#browser-stage")).toHaveClass(/has-pointer/);
+});
+
+test("settings and admin panels keep optional controls collapsed", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "User settings" }).click();
+	await expect(page.locator("#user-settings-form details[open]")).toHaveCount(1);
+	await expect(
+		page.locator("#user-settings-form details:not([open])")
+	).toHaveCount(2);
+	await page.locator("#user-settings-dialog").press("Escape");
+
+	await page.locator("#admin-open").click();
+	await page.getByLabel("Admin password").fill(password);
+	await page.getByRole("button", { name: "Sign in" }).click();
+	await expect(page.locator("#admin-settings")).toBeVisible();
+	await expect(page.locator("#admin-settings details[open]")).toHaveCount(0);
+});
+
+test("games page loads every catalog page with game artwork", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	const firstPage = Array.from({ length: 100 }, (_, index) => ({
+		Title: `Catalog Game ${index}`,
+		Url: `https://html5.gamedistribution.com/catalog-${index}/`,
+		Asset: [`https://img.gamedistribution.com/catalog-${index}.jpg`],
+		Category: ["Arcade"],
+		Tag: ["catalog"],
+	}));
+	const secondPage = [
+		{
+			Title: "Catalog Game 100",
+			Url: "https://html5.gamedistribution.com/catalog-100/",
+			Asset: ["https://img.gamedistribution.com/catalog-100.jpg"],
+			Category: ["Arcade"],
+			Tag: ["catalog"],
+		},
+	];
+	const requestedPages = [];
+	await page.route(
+		"https://catalog.api.gamedistribution.com/**",
+		async (route) => {
+			const pageNumber = Number(
+				new URL(route.request().url()).searchParams.get("page")
+			);
+			requestedPages.push(pageNumber);
+			await route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify(pageNumber === 1 ? firstPage : secondPage),
+			});
+		}
+	);
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "Open games" }).click();
+	await expect(page.locator("#games-status")).toHaveText(
+		"Showing 100 of 101 matching games (101 total)"
+	);
+	await expect(page.locator(".game-card")).toHaveCount(100);
+	await expect(page.locator("#game-grid img")).toHaveCount(100);
+	await expect(page.locator("#game-grid img").first()).toHaveAttribute(
+		"src",
+		"https://img.gamedistribution.com/catalog-0.jpg"
+	);
+	expect(requestedPages).toContain(1);
+	expect(requestedPages).toContain(2);
+	await page.getByRole("button", { name: "Load 1 more game" }).click();
+	await expect(page.locator(".game-card")).toHaveCount(101);
+
+	await page.locator("#games-search").fill("Catalog Game 100");
+	await expect(page.locator(".game-card")).toHaveCount(1);
+	await expect(page.locator(".game-card")).toContainText("Catalog Game 100");
+});
+
+test("games render while later catalog pages are still loading", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	const firstPage = Array.from({ length: 100 }, (_, index) => ({
+		Title: `Progress Game ${index}`,
+		Url: `https://html5.gamedistribution.com/progress-${index}/`,
+		Category: ["Arcade"],
+	}));
+	await page.route(
+		"https://catalog.api.gamedistribution.com/**",
+		async (route) => {
+			const pageNumber = Number(
+				new URL(route.request().url()).searchParams.get("page")
+			);
+			if (pageNumber > 1) {
+				await new Promise((resolve) => setTimeout(resolve, 1500));
+			}
+			await route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify(pageNumber === 1 ? firstPage : []),
+			});
+		}
+	);
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "Open games" }).click();
+	await expect(page.locator("#games-status")).toContainText("100 loaded");
+	await expect(page.locator(".game-card")).toHaveCount(100);
+	await expect(page.locator("#games-status")).toHaveText(
+		"Showing 100 of 100 matching games (100 total)",
+		{ timeout: 5000 }
+	);
+});
+
+test("fullscreen exit shortcut is configurable in user settings", async ({
+	page,
+}) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+	await page.getByRole("button", { name: "User settings" }).click();
+	await openSettingsSection(page, "Browser");
+	await page.locator("#fullscreen-exit-shortcut").selectOption("ctrl-shift-f");
+	await page.getByRole("button", { name: "Save theme" }).click();
+	await expect(page.locator("#user-settings-dialog")).toBeHidden();
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() =>
+					JSON.parse(localStorage.getItem("classroom-user-settings"))
+						.fullscreenExitShortcut
+			)
+		)
+		.toBe("ctrl-shift-f");
+
+	const result = await page.evaluate(() => {
+		let exits = 0;
+		Object.defineProperty(document, "fullscreenElement", {
+			configurable: true,
+			value: document.documentElement,
+		});
+		document.exitFullscreen = async () => {
+			exits++;
+		};
+		const event = new KeyboardEvent("keydown", {
+			key: "f",
+			ctrlKey: true,
+			shiftKey: true,
+			bubbles: true,
+			cancelable: true,
+		});
+		document.dispatchEvent(event);
+		return { exits, prevented: event.defaultPrevented };
+	});
+	expect(result).toEqual({ exits: 1, prevented: true });
 });
 
 test("encrypted local backup restores Classroom preferences and proxy cookies", async ({
@@ -202,7 +464,13 @@ test("encrypted local backup restores Classroom preferences and proxy cookies", 
 	});
 
 	await page.getByRole("button", { name: "User settings" }).click();
-	await page.locator("#backup-passphrase").fill("correct horse battery");
+	await openSettingsSection(page, "Local backup");
+	await page.locator("#backup-passphrase").fill("1234567");
+	await page.getByRole("button", { name: "Export encrypted backup" }).click();
+	await expect(page.locator("#backup-message")).toHaveText(
+		"Backup export failed: Choose a passphrase with at least 8 characters."
+	);
+	await page.locator("#backup-passphrase").fill("correct1");
 	const downloadPromise = page.waitForEvent("download");
 	await page.getByRole("button", { name: "Export encrypted backup" }).click();
 	const download = await downloadPromise;
@@ -433,6 +701,7 @@ test("existing preset preferences migrate to a custom theme", async ({ page }) =
 	await expect(page.locator("#user-settings-dialog")).toBeHidden();
 	await page.getByRole("button", { name: "User settings" }).click();
 	await expect(page.locator("#theme-name")).toHaveValue("My theme");
+	await openSettingsSection(page, "Background");
 	await expect(page.locator("#background-type")).toHaveValue("color");
 	expect(
 		await page.locator("html").evaluate((root) =>
@@ -445,6 +714,7 @@ test("custom image backgrounds remain available", async ({ page }) => {
 	await useReturningUserSettings(page);
 	await page.goto(baseUrl);
 	await page.getByRole("button", { name: "User settings" }).click();
+	await openSettingsSection(page, "Background");
 	await page.locator("#background-type").selectOption("image");
 	await page.locator("#background-image-file").setInputFiles({
 		name: "background.png",
@@ -490,6 +760,7 @@ test("uploaded video backgrounds persist locally", async ({ page }) => {
 	await useReturningUserSettings(page);
 	await page.goto(baseUrl);
 	await page.getByRole("button", { name: "User settings" }).click();
+	await openSettingsSection(page, "Background");
 	await page.locator("#background-type").selectOption("video");
 	await page.locator("#background-video-file").setInputFiles({
 		name: "background.mp4",
@@ -543,6 +814,7 @@ test("uploaded video backgrounds persist locally", async ({ page }) => {
 		.toContain("blob:");
 
 	await page.getByRole("button", { name: "User settings" }).click();
+	await openSettingsSection(page, "Background");
 	await page.locator("#background-type").selectOption("video");
 	await page
 		.locator("#background-video-url")
@@ -562,6 +834,7 @@ test("tab appearance cloaks only the outer Classroom tab", async ({ page }) => {
 	await useReturningUserSettings(page);
 	await page.goto(baseUrl);
 	await page.getByRole("button", { name: "User settings" }).click();
+	await openSettingsSection(page, "Browser");
 	for (const [id, title, logo] of [
 		["normal", "New tab", "/sj.png"],
 		["kahoot", "Enter Game PIN - Kahoot!", "/logos/kahoot-icon.svg"],

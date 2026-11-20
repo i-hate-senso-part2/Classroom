@@ -26,7 +26,10 @@
 				this.rel = 'stylesheet';
 			"
 		/>
-		<link rel="stylesheet" href="browser.css" />
+		<link
+			rel="stylesheet"
+			href="browser.css?v=v7-particle-settings-20261120"
+		/>
 		<script>
 			(() => {
 				let version = "v2";
@@ -71,7 +74,10 @@
 		<script src="config.js" defer></script>
 		<script src="register-sw.js?v=v2-worker-activation-20261117" defer></script>
 		<script src="search.js" defer></script>
-		<script src="index.js?v=v1-duckduckgo-20261117" defer></script>
+		<script
+			src="index.js?v=v7-particle-settings-20261120"
+			defer
+		></script>
 	</head>
 
 	<body>
@@ -329,6 +335,7 @@
 						aria-hidden="true"
 						hidden
 					></video>
+					<canvas class="theme-particles" aria-hidden="true"></canvas>
 					<div class="home-content">
 						<section class="home-lead" aria-label="Start browsing">
 							<div class="home-brand">
@@ -407,6 +414,7 @@
 					aria-label="Games"
 					hidden
 				>
+					<canvas class="theme-particles" aria-hidden="true"></canvas>
 					<div class="games-content">
 						<header class="games-header">
 							<div>
@@ -431,7 +439,16 @@
 								type="button"
 								data-game-url="https://selenite.cc/"
 							>
-								<span class="game-provider-icon" aria-hidden="true">S</span>
+								<span class="game-provider-favicon" aria-hidden="true">
+									<img
+										src="https://selenite.cc/favicon.ico"
+										alt=""
+										crossorigin="anonymous"
+										loading="lazy"
+										decoding="async"
+										referrerpolicy="no-referrer"
+									/>
+								</span>
 								<span>
 									<strong>Selenite Games</strong>
 									<small>Open the Selenite games hub</small>
@@ -449,7 +466,16 @@
 								type="button"
 								data-game-url="https://gamedistribution.com/games/"
 							>
-								<span class="game-provider-icon" aria-hidden="true">GD</span>
+								<span class="game-provider-favicon" aria-hidden="true">
+									<img
+										src="https://gamedistribution.com/favicon.ico"
+										alt=""
+										crossorigin="anonymous"
+										loading="lazy"
+										decoding="async"
+										referrerpolicy="no-referrer"
+									/>
+								</span>
 								<span>
 									<strong>GameDistribution</strong>
 									<small>Browse the complete game catalog</small>
@@ -467,7 +493,16 @@
 								type="button"
 								data-game-url="https://www.raccoongame.com/#/platform/cloudgame"
 							>
-								<span class="game-provider-icon" aria-hidden="true">R</span>
+								<span class="game-provider-favicon" aria-hidden="true">
+									<img
+										src="https://www.raccoongame.com/favicon.ico"
+										alt=""
+										crossorigin="anonymous"
+										loading="lazy"
+										decoding="async"
+										referrerpolicy="no-referrer"
+									/>
+								</span>
 								<span>
 									<strong>RacoonGaming</strong>
 									<small>Cloud gaming</small>
@@ -504,8 +539,8 @@
 									<input
 										id="games-search"
 										type="search"
-										placeholder="Search games"
-										aria-label="Search games"
+										placeholder="Search by game, category, or tag"
+										aria-label="Search games by title, category, or tag"
 									/>
 								</label>
 								<label class="game-filter">
@@ -529,10 +564,16 @@
 							<p id="games-empty" class="games-empty" hidden>
 								No games match those filters.
 							</p>
+							<button
+								id="games-more"
+								class="dialog-secondary games-more"
+								type="button"
+								hidden
+							>
+								Load more games
+							</button>
 							<p class="game-catalog-note">
-								The list shows games available from GameDistribution's public
-								catalog feed. Use the provider link above to browse its full
-								catalog.
+								Games are loaded from GameDistribution's public catalog feed.
 							</p>
 						</section>
 					</div>
@@ -612,32 +653,38 @@
 				<button class="dialog-primary" type="submit">Sign in</button>
 			</form>
 			<section id="admin-settings" hidden>
-				<div class="admin-status-grid" aria-label="Live status">
-					<div class="admin-status-card">
-						<span>Access</span>
-						<strong id="admin-status-access">Checking</strong>
-						<small
-							id="admin-status-access-detail"
-							class="admin-status-detail"
-						></small>
+				<details class="admin-section admin-overview">
+					<summary class="admin-section-heading">
+						<div><h3>System status</h3></div>
+						<p>View live service health.</p>
+					</summary>
+					<div class="admin-status-grid" aria-label="Live status">
+						<div class="admin-status-card">
+							<span>Access</span>
+							<strong id="admin-status-access">Checking</strong>
+							<small
+								id="admin-status-access-detail"
+								class="admin-status-detail"
+							></small>
+						</div>
+						<div class="admin-status-card">
+							<span>Announcement</span>
+							<strong id="admin-status-announcement">Checking</strong>
+						</div>
+						<div class="admin-status-card">
+							<span>Shared links</span>
+							<strong id="admin-status-links">Checking</strong>
+						</div>
+						<div class="admin-status-card">
+							<span>State store</span>
+							<strong id="admin-status-store">Checking</strong>
+						</div>
+						<div class="admin-status-card">
+							<span>Transport</span>
+							<strong id="admin-status-transport">Not checked</strong>
+						</div>
 					</div>
-					<div class="admin-status-card">
-						<span>Announcement</span>
-						<strong id="admin-status-announcement">Checking</strong>
-					</div>
-					<div class="admin-status-card">
-						<span>Shared links</span>
-						<strong id="admin-status-links">Checking</strong>
-					</div>
-					<div class="admin-status-card">
-						<span>State store</span>
-						<strong id="admin-status-store">Checking</strong>
-					</div>
-					<div class="admin-status-card">
-						<span>Transport</span>
-						<strong id="admin-status-transport">Not checked</strong>
-					</div>
-				</div>
+				</details>
 				<details class="admin-section">
 					<summary class="admin-section-heading">
 						<div><h3>Connection check</h3></div>
@@ -652,7 +699,7 @@
 						</button>
 					</div>
 				</details>
-				<details class="admin-section" aria-labelledby="access-heading" open>
+				<details class="admin-section" aria-labelledby="access-heading">
 					<summary class="admin-section-heading">
 						<div>
 							<h3 id="access-heading">Access</h3>
@@ -750,7 +797,7 @@
 				<details class="admin-section" aria-labelledby="links-heading">
 					<summary class="admin-section-heading">
 						<div>
-							<h3 id="links-heading">Shared quick links</h3>
+							<h3 id="links-heading">Homepage shortcuts</h3>
 						</div>
 						<p>Choose homepage shortcuts.</p>
 					</summary>
@@ -791,17 +838,20 @@
 						</button>
 					</div>
 				</details>
-				<section
-					class="admin-section admin-section-actions"
-					aria-label="Actions"
-				>
-					<button id="refresh-all" class="dialog-secondary" type="button">
-						Refresh everyone else
-					</button>
-					<button id="admin-logout" class="dialog-secondary" type="button">
-						Sign out
-					</button>
-				</section>
+				<details class="admin-section admin-section-actions">
+					<summary class="admin-section-heading">
+						<div><h3>Administrator actions</h3></div>
+						<p>Refresh visitors or sign out.</p>
+					</summary>
+					<div class="admin-actions">
+						<button id="refresh-all" class="dialog-secondary" type="button">
+							Refresh everyone else
+						</button>
+						<button id="admin-logout" class="dialog-secondary" type="button">
+							Sign out
+						</button>
+					</div>
+				</details>
 			</section>
 			<p id="admin-message" class="dialog-message" aria-live="polite"></p>
 		</dialog>
@@ -960,103 +1010,139 @@
 				<p id="theme-onboarding-message" class="dialog-message" hidden>
 					Create and save a custom theme to start using Classroom.
 				</p>
-				<label for="theme-name">Theme name</label>
-				<input
-					id="theme-name"
-					type="text"
-					maxlength="40"
-					autocomplete="off"
-					required
-				/>
-				<fieldset class="theme-colors">
-					<legend>Theme colors</legend>
-					<label for="theme-color-background">Page background</label>
-					<input id="theme-color-background" type="color" value="#0c100e" />
-					<label for="theme-color-surface">Panels and surfaces</label>
-					<input id="theme-color-surface" type="color" value="#151a17" />
-					<label for="theme-color-text">Text</label>
-					<input id="theme-color-text" type="color" value="#e8eee8" />
-					<label for="theme-color-accent">Accent</label>
-					<input id="theme-color-accent" type="color" value="#c4e879" />
-				</fieldset>
-				<label for="background-type">Home background</label>
-				<select id="background-type">
-					<option value="color">Theme color</option>
-					<option value="image">Custom image</option>
-					<option value="video">Custom video</option>
-				</select>
-				<div id="background-image-controls" hidden>
-					<label for="background-image-file">Background image</label>
-					<div class="file-picker">
+				<details class="settings-section" open>
+					<summary>
+						<span>Theme</span>
+						<small>Choose a name and colors</small>
+					</summary>
+					<div class="settings-section-content">
+						<label for="theme-name">Theme name</label>
 						<input
-							id="background-image-file"
-							class="file-picker-input"
-							type="file"
-							accept="image/png,image/jpeg,image/webp,image/gif"
+							id="theme-name"
+							type="text"
+							maxlength="40"
+							autocomplete="off"
+							required
 						/>
-						<label class="file-picker-button" for="background-image-file"
-							>Choose image</label
-						>
-						<span id="background-image-name" class="file-picker-name"
-							>No image selected</span
-						>
+						<fieldset class="theme-colors">
+							<legend>Theme colors</legend>
+							<label for="theme-color-background">Page background</label>
+							<input id="theme-color-background" type="color" value="#0c100e" />
+							<label for="theme-color-surface">Panels and surfaces</label>
+							<input id="theme-color-surface" type="color" value="#151a17" />
+							<label for="theme-color-text">Text</label>
+							<input id="theme-color-text" type="color" value="#e8eee8" />
+							<label for="theme-color-accent">Accent</label>
+							<input id="theme-color-accent" type="color" value="#c4e879" />
+						</fieldset>
 					</div>
-					<div class="background-image-preview-row">
-						<img id="background-image-preview" alt="" hidden />
-					</div>
-					<label class="setting-row" for="background-image-overlay">
-						<span>
-							<strong>Overlay with page color</strong>
-							<small>Turn this off to show the image without a tint.</small>
-						</span>
-						<input id="background-image-overlay" type="checkbox" checked />
-					</label>
-				</div>
-				<div id="background-video-controls" hidden>
-					<label for="background-video-file">Video background</label>
-					<div class="file-picker">
-						<input
-							id="background-video-file"
-							class="file-picker-input"
-							type="file"
-							accept="video/mp4,video/webm"
-						/>
-						<label class="file-picker-button" for="background-video-file"
-							>Choose video</label
+				</details>
+				<details class="settings-section">
+					<summary>
+						<span>Background</span>
+						<small>Color, image, or video</small>
+					</summary>
+					<div class="settings-section-content">
+						<label for="background-type">Home background</label>
+						<select id="background-type">
+							<option value="color">Theme color</option>
+							<option value="image">Custom image</option>
+							<option value="video">Custom video</option>
+						</select>
+						<div id="background-image-controls" hidden>
+							<label for="background-image-file">Background image</label>
+							<div class="file-picker">
+								<input
+									id="background-image-file"
+									class="file-picker-input"
+									type="file"
+									accept="image/png,image/jpeg,image/webp,image/gif"
+								/>
+								<label class="file-picker-button" for="background-image-file"
+									>Choose image</label
+								>
+								<span id="background-image-name" class="file-picker-name"
+									>No image selected</span
+								>
+							</div>
+							<div class="background-image-preview-row">
+								<img id="background-image-preview" alt="" hidden />
+							</div>
+							<label class="setting-row" for="background-image-overlay">
+								<span>
+									<strong>Overlay with page color</strong>
+									<small>Turn this off to show the image without a tint.</small>
+								</span>
+								<input id="background-image-overlay" type="checkbox" checked />
+							</label>
+						</div>
+						<div id="background-video-controls" hidden>
+							<label for="background-video-file">Video background</label>
+							<div class="file-picker">
+								<input
+									id="background-video-file"
+									class="file-picker-input"
+									type="file"
+									accept="video/mp4,video/webm"
+								/>
+								<label class="file-picker-button" for="background-video-file"
+									>Choose video</label
+								>
+								<span id="background-video-name" class="file-picker-name"
+									>No video selected</span
+								>
+							</div>
+							<label for="background-video-url"
+								>Or paste a direct MP4/WebM URL</label
+							>
+							<input
+								id="background-video-url"
+								type="url"
+								placeholder="https://example.com/background.mp4"
+							/>
+							<small class="theme-help">
+								Videos play muted and loop. Uploaded videos up to 50 MB stay in
+								this browser.
+							</small>
+						</div>
+						<button
+							id="background-media-remove"
+							class="dialog-secondary"
+							type="button"
+							hidden
 						>
-						<span id="background-video-name" class="file-picker-name"
-							>No video selected</span
-						>
+							Remove background media
+						</button>
 					</div>
-					<label for="background-video-url"
-						>Or paste a direct MP4/WebM URL</label
-					>
-					<input
-						id="background-video-url"
-						type="url"
-						placeholder="https://example.com/background.mp4"
-					/>
-					<small class="theme-help">
-						Videos play muted and loop. Uploaded videos up to 50 MB stay in this
-						browser.
-					</small>
-				</div>
-				<button
-					id="background-media-remove"
-					class="dialog-secondary"
-					type="button"
-					hidden
-				>
-					Remove background media
-				</button>
-				<label for="default-cloak-select">Default tab appearance</label>
-				<select id="default-cloak-select">
-					<option value="normal">Original</option>
-					<option value="kahoot">Enter Game PIN - Kahoot!</option>
-					<option value="google">Google</option>
-					<option value="classroom">Home - Classroom</option>
-					<option value="wikipedia">Wikipedia</option>
-				</select>
+				</details>
+				<details class="settings-section">
+					<summary>
+						<span>Browser</span>
+						<small>Tab appearance and shortcuts</small>
+					</summary>
+					<div class="settings-section-content">
+						<label for="default-cloak-select">Default tab appearance</label>
+						<select id="default-cloak-select">
+							<option value="normal">Original</option>
+							<option value="kahoot">Enter Game PIN - Kahoot!</option>
+							<option value="google">Google</option>
+							<option value="classroom">Home - Classroom</option>
+							<option value="wikipedia">Wikipedia</option>
+						</select>
+						<label for="fullscreen-exit-shortcut"
+							>Extra full screen exit shortcut</label
+						>
+						<select id="fullscreen-exit-shortcut">
+							<option value="none">None</option>
+							<option value="ctrl-shift-f">Ctrl/Cmd+Shift+F</option>
+							<option value="alt-enter">Alt+Enter</option>
+						</select>
+						<small class="theme-help">
+							Browsers always allow Escape to exit full screen. Choose an
+							additional keyboard shortcut here.
+						</small>
+					</div>
+				</details>
 				<div class="settings-actions">
 					<button id="theme-save" class="dialog-primary" type="submit">
 						Save theme
@@ -1068,41 +1154,46 @@
 					aria-live="polite"
 				></p>
 			</form>
-			<section class="backup-section" aria-labelledby="backup-title">
-				<h3 id="backup-title">Local backup</h3>
-				<p>
-					Export settings, bookmarks, theme media, and Scramjet V1/V2 proxy
-					cookies. The encrypted file stays on this device. Keep it and your
-					passphrase private; restoring cookies may restore signed-in sessions.
-				</p>
-				<label for="backup-passphrase">Backup passphrase</label>
-				<input
-					id="backup-passphrase"
-					type="password"
-					autocomplete="new-password"
-					minlength="12"
-					placeholder="At least 12 characters"
-				/>
-				<div class="backup-actions">
-					<button id="backup-export" class="dialog-secondary" type="button">
-						Export encrypted backup
-					</button>
-					<button
-						id="backup-import-button"
-						class="dialog-secondary"
-						type="button"
-					>
-						Import backup
-					</button>
+			<details class="settings-section backup-section">
+				<summary>
+					<span id="backup-title">Local backup</span>
+					<small>Encrypted settings and cookies</small>
+				</summary>
+				<div class="settings-section-content">
+					<p>
+						Export settings, bookmarks, theme media, and Scramjet V1/V2 proxy
+						cookies. The encrypted file stays on this device. Keep it and your
+						passphrase private; restoring cookies may restore signed-in sessions.
+					</p>
+					<label for="backup-passphrase">Backup passphrase</label>
 					<input
-						id="backup-import-file"
-						type="file"
-						accept="application/json,.json"
-						hidden
+						id="backup-passphrase"
+						type="password"
+						autocomplete="new-password"
+						minlength="8"
+						placeholder="At least 8 characters"
 					/>
+					<div class="backup-actions">
+						<button id="backup-export" class="dialog-secondary" type="button">
+							Export encrypted backup
+						</button>
+						<button
+							id="backup-import-button"
+							class="dialog-secondary"
+							type="button"
+						>
+							Import backup
+						</button>
+						<input
+							id="backup-import-file"
+							type="file"
+							accept="application/json,.json"
+							hidden
+						/>
+					</div>
+					<p id="backup-message" class="dialog-message" aria-live="polite"></p>
 				</div>
-				<p id="backup-message" class="dialog-message" aria-live="polite"></p>
-			</section>
+			</details>
 		</dialog>
 		<section
 			id="blocked-overlay"

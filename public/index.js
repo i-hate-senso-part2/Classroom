@@ -52,6 +52,13 @@ const tabList = document.getElementById("tab-list");
 const frameHost = document.getElementById("frame-host");
 const homeScreen = document.getElementById("home-screen");
 const gamesScreen = document.getElementById("games-screen");
+const browserStage = document.getElementById("browser-stage");
+const themeParticleCanvases = [
+	...document.querySelectorAll(".theme-particles"),
+];
+const prefersReducedMotion = window.matchMedia(
+	"(prefers-reduced-motion: reduce)"
+);
 const gameGrid = document.getElementById("game-grid");
 const progress = document.getElementById("browser-progress");
 const quickLinks = document.getElementById("quick-links");
@@ -136,7 +143,14 @@ const THEME_COLORS = Object.freeze({
 	accent: "#c4e879",
 });
 const THEME_COLOR_KEYS = Object.keys(THEME_COLORS);
+const FULLSCREEN_EXIT_SHORTCUTS = new Set([
+	"none",
+	"ctrl-shift-f",
+	"alt-enter",
+]);
 const VIDEO_BACKGROUND_MAX_BYTES = 50 * 1024 * 1024;
+const GAME_CATALOG_PAGE_SIZE = 100;
+const GAME_CATALOG_BATCH_SIZE = 8;
 const TESTING_OVERLAY_SEARCH_CHANCE = 1 / 10000;
 const THEME_ASSET_DB_NAME = "classroom-theme-assets";
 const THEME_ASSET_STORE = "videos";
@@ -178,6 +192,7 @@ let sharedLinksHistory = [];
 let renderedSharedLinks = "";
 let gameCatalog = [];
 let gameCatalogLoading = false;
+let visibleGameLimit = GAME_CATALOG_PAGE_SIZE;
 let arrowSequenceIndex = 0;
 const arrowSequence = ["ArrowUp", "ArrowDown", "ArrowUp", "ArrowDown"];
 
@@ -201,6 +216,7 @@ function defaultUserSettings() {
 			backgroundVideoStored: false,
 		},
 		defaultCloak: "normal",
+		fullscreenExitShortcut: "none",
 	};
 }
 
@@ -297,6 +313,11 @@ function loadUserSettings() {
 					defaultCloak: CLOAK_NAMES.has(stored.defaultCloak)
 						? stored.defaultCloak
 						: "normal",
+					fullscreenExitShortcut: FULLSCREEN_EXIT_SHORTCUTS.has(
+						stored.fullscreenExitShortcut
+					)
+						? stored.fullscreenExitShortcut
+						: "none",
 				};
 			}
 			const themeColors =
@@ -321,6 +342,7 @@ function loadUserSettings() {
 				defaultCloak: CLOAK_NAMES.has(stored.defaultCloak)
 					? stored.defaultCloak
 					: "normal",
+				fullscreenExitShortcut: "none",
 			};
 		}
 	} catch {
@@ -718,6 +740,7 @@ function syncBrowser() {
 	}
 	homeScreen.hidden = !tab.home || tab.games === true;
 	gamesScreen.hidden = tab.games !== true;
+	requestThemeParticleRender();
 	document
 		.getElementById("games-open")
 		.setAttribute("aria-pressed", String(tab.games === true));
@@ -815,6 +838,7 @@ function updateBackgroundControls(theme) {
 function cloneUserSettings(settings) {
 	return {
 		defaultCloak: settings.defaultCloak,
+		fullscreenExitShortcut: settings.fullscreenExitShortcut || "none",
 		theme: {
 			...settings.theme,
 			colors: { ...settings.theme.colors },
@@ -1269,8 +1293,8 @@ function validateLocalBackup(backup) {
 
 function backupPassphrase() {
 	const passphrase = document.getElementById("backup-passphrase").value;
-	if (passphrase.length < 12) {
-		throw new Error("Choose a passphrase with at least 12 characters.");
+	if (passphrase.length < 8) {
+		throw new Error("Choose a passphrase with at least 8 characters.");
 	}
 	return passphrase;
 }
@@ -1295,8 +1319,13 @@ async function exportLocalBackup() {
 		const link = document.createElement("a");
 		link.href = downloadUrl;
 		link.download = `classroom-backup-${new Date().toISOString().slice(0, 10)}.json`;
-		link.click();
-		window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+		document.body.append(link);
+		try {
+			link.click();
+		} finally {
+			link.remove();
+		}
+		window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 30000);
 		showBackupMessage("Encrypted backup downloaded to this device.");
 	} catch (error) {
 		showBackupMessage(`Backup export failed: ${error.message}`, true);
@@ -1380,6 +1409,9 @@ function readSettingsForm() {
 				.value.trim(),
 		},
 		defaultCloak: document.getElementById("default-cloak-select").value,
+		fullscreenExitShortcut: document.getElementById(
+			"fullscreen-exit-shortcut"
+		).value,
 	};
 }
 
@@ -1395,6 +1427,8 @@ function syncSettingsForm(settings) {
 	document.getElementById("background-video-url").value =
 		theme.backgroundVideoUrl || "";
 	document.getElementById("default-cloak-select").value = settings.defaultCloak;
+	document.getElementById("fullscreen-exit-shortcut").value =
+		settings.fullscreenExitShortcut || "none";
 	const preview = document.getElementById("background-image-preview");
 	preview.hidden = theme.backgroundType !== "image" || !theme.backgroundImage;
 	preview.src = theme.backgroundImage || "";
@@ -2056,44 +2090,92 @@ function getVisibleGames() {
 
 function renderGames() {
 	const games = getVisibleGames();
+	const visibleGames = games.slice(0, visibleGameLimit);
 	gameGrid.replaceChildren();
-	for (const game of games) {
+	for (const game of visibleGames) {
 		const card = document.createElement("button");
 		card.type = "button";
 		card.className = "game-card";
 		card.dataset.gameUrl = game.Url;
 		card.setAttribute("aria-label", `Play ${game.Title}`);
-		const image = document.createElement("img");
-		image.src = game.Asset[0];
-		image.alt = "";
-		image.loading = "lazy";
-		image.referrerPolicy = "no-referrer";
+		if (game.Asset) {
+			const image = document.createElement("img");
+			image.crossOrigin = "anonymous";
+			image.referrerPolicy = "no-referrer";
+			image.src = game.Asset;
+			image.alt = "";
+			image.loading = "lazy";
+			image.decoding = "async";
+			image.addEventListener(
+				"error",
+				() => {
+					image.hidden = true;
+				},
+				{ once: true }
+			);
+			card.append(image);
+		}
 		const copy = document.createElement("span");
 		copy.className = "game-card-copy";
 		const title = document.createElement("strong");
 		title.textContent = game.Title;
 		const category = document.createElement("small");
-		category.textContent = game.Category.join(" / ") || "GameDistribution";
+		category.textContent = game.Category.join(" / ") || "Game";
 		copy.append(title, category);
-		card.append(image, copy);
+		card.append(copy);
 		gameGrid.append(card);
 	}
 	document.getElementById("games-empty").hidden = games.length > 0;
+	if (gameCatalogLoading && !games.length) {
+		document.getElementById("games-empty").textContent =
+			"Still loading the full catalog. New matches will appear as games arrive.";
+	} else {
+		document.getElementById("games-empty").textContent =
+			"No games match those filters.";
+	}
+	const loadMore = document.getElementById("games-more");
+	loadMore.hidden = visibleGames.length >= games.length;
+	const remaining = Math.min(
+		GAME_CATALOG_PAGE_SIZE,
+		games.length - visibleGames.length
+	);
+	loadMore.textContent = `Load ${remaining} more ${
+		remaining === 1 ? "game" : "games"
+	}`;
 	if (gameCatalog.length) {
 		document.getElementById("games-status").textContent =
-			`Showing ${games.length} of ${gameCatalog.length} catalog games`;
+			gameCatalogLoading
+				? `Showing ${visibleGames.length} of ${games.length} loaded matches (${gameCatalog.length} loaded); loading more games…`
+				: `Showing ${visibleGames.length} of ${games.length} matching games (${gameCatalog.length} total)`;
+	}
+}
+
+function updateGameCategories() {
+	const categorySelect = document.getElementById("games-category");
+	const selectedCategory = categorySelect.value;
+	const categories = [
+		...new Set(gameCatalog.flatMap((game) => game.Category)),
+	].sort((a, b) => a.localeCompare(b));
+	categorySelect.replaceChildren(new Option("All categories", ""));
+	for (const category of categories) {
+		categorySelect.add(new Option(category, category));
+	}
+	if (categories.includes(selectedCategory)) {
+		categorySelect.value = selectedCategory;
 	}
 }
 
 async function loadGameCatalog(force = false) {
 	if (gameCatalogLoading || (gameCatalog.length && !force)) return;
 	gameCatalogLoading = true;
+	visibleGameLimit = GAME_CATALOG_PAGE_SIZE;
 	const status = document.getElementById("games-status");
 	const errorMessage = document.getElementById("games-error");
 	errorMessage.hidden = true;
 	status.textContent = "Loading GameDistribution games…";
 	const controller = new AbortController();
-	const timeout = window.setTimeout(() => controller.abort(), 20000);
+	const timeout = window.setTimeout(() => controller.abort(), 120000);
+	let loadedSuccessfully = false;
 	try {
 		const params = new URLSearchParams({
 			collection: "all",
@@ -2103,57 +2185,95 @@ async function loadGameCatalog(force = false) {
 			mobile: "all",
 			rewarded: "all",
 			high: "all",
-			n: "100",
-			p: "1",
+			n: String(GAME_CATALOG_PAGE_SIZE),
 		});
-		const response = await fetch(
-			`https://catalog.api.gamedistribution.com/api/v2.0/rss/All/?${params}`,
-			{ signal: controller.signal }
-		);
-		if (!response.ok) {
-			throw new Error(`Catalog request failed (${response.status}).`);
-		}
-		const data = await response.json();
-		if (!Array.isArray(data)) {
-			throw new Error(
-				"The GameDistribution catalog returned an invalid response."
+		const catalog = new Map();
+		const pageSignatures = new Set();
+		for (let firstPage = 1; ; ) {
+			const batchSize =
+				firstPage === 1 ? 1 : GAME_CATALOG_BATCH_SIZE;
+			const pageNumbers = Array.from(
+				{ length: batchSize },
+				(_, index) => firstPage + index
 			);
-		}
-		gameCatalog = data
-			.filter(
-				(game) =>
-					typeof game?.Title === "string" &&
-					typeof game?.Url === "string" &&
-					/^https:\/\/html5\.gamedistribution\.com\//.test(game.Url) &&
-					Array.isArray(game.Asset) &&
-					typeof game.Asset[0] === "string" &&
-					/^https:\/\/img\.gamedistribution\.com\//.test(game.Asset[0])
-			)
-			.map((game) => ({
-				Title: game.Title,
-				Description:
-					typeof game.Description === "string" ? game.Description : "",
-				Url: game.Url,
-				Asset: game.Asset,
-				Category: Array.isArray(game.Category)
-					? game.Category.filter((value) => typeof value === "string")
-					: [],
-				Tag: Array.isArray(game.Tag)
-					? game.Tag.filter((value) => typeof value === "string")
-					: [],
-			}));
-		const categories = [
-			...new Set(gameCatalog.flatMap((game) => game.Category)),
-		].sort((a, b) => a.localeCompare(b));
-		const categorySelect = document.getElementById("games-category");
-		categorySelect.replaceChildren(new Option("All categories", ""));
-		for (const category of categories) {
-			categorySelect.add(new Option(category, category));
+			status.textContent = `Loading games (pages ${firstPage}–${firstPage + batchSize - 1}; ${catalog.size} loaded)…`;
+			const pages = await Promise.all(
+				pageNumbers.map(async (page) => {
+					const pageParams = new URLSearchParams(params);
+					pageParams.set("page", String(page));
+					const response = await fetch(
+						`https://catalog.api.gamedistribution.com/api/v2.0/rss/All/?${pageParams}`,
+						{ signal: controller.signal }
+					);
+					if (!response.ok) {
+						throw new Error(`Catalog request failed (${response.status}).`);
+					}
+					const data = await response.json();
+					if (!Array.isArray(data)) {
+						throw new Error(
+							"The GameDistribution catalog returned an invalid response."
+						);
+					}
+					return { page, data };
+				})
+			);
+			let endOfCatalog = false;
+			for (const { page, data } of pages) {
+				if (data.length < GAME_CATALOG_PAGE_SIZE) endOfCatalog = true;
+				if (data.length === 0) break;
+				const signature = JSON.stringify(
+					data.map((game) =>
+						typeof game?.Url === "string" ? game.Url : game?.Title || ""
+					)
+				);
+				if (pageSignatures.has(signature)) {
+					throw new Error(
+						`The catalog repeated results on page ${page}; loading stopped to avoid showing an incomplete list.`
+					);
+				}
+				pageSignatures.add(signature);
+				for (const game of data) {
+					if (
+						typeof game?.Title !== "string" ||
+						typeof game?.Url !== "string" ||
+						!/^https:\/\/html5\.gamedistribution\.com\//.test(game.Url)
+					) {
+						continue;
+					}
+					const asset = Array.isArray(game.Asset)
+						? game.Asset.find(
+								(value) =>
+									typeof value === "string" &&
+									/^https:\/\/img\.gamedistribution\.com\//.test(value)
+							)
+						: "";
+					if (catalog.has(game.Url)) continue;
+					catalog.set(game.Url, {
+						Title: game.Title,
+						Description:
+							typeof game.Description === "string" ? game.Description : "",
+						Url: game.Url,
+						Asset: asset,
+						Category: Array.isArray(game.Category)
+							? game.Category.filter((value) => typeof value === "string")
+							: [],
+						Tag: Array.isArray(game.Tag)
+							? game.Tag.filter((value) => typeof value === "string")
+							: [],
+					});
+				}
+				if (endOfCatalog) break;
+			}
+			gameCatalog = [...catalog.values()];
+			updateGameCategories();
+			renderGames();
+			if (endOfCatalog) break;
+			firstPage += batchSize;
 		}
 		if (!gameCatalog.length) {
 			throw new Error("No playable games were found in the catalog response.");
 		}
-		renderGames();
+		loadedSuccessfully = true;
 	} catch (error) {
 		const detail =
 			error.name === "AbortError"
@@ -2165,6 +2285,7 @@ async function loadGameCatalog(force = false) {
 	} finally {
 		window.clearTimeout(timeout);
 		gameCatalogLoading = false;
+		if (loadedSuccessfully) renderGames();
 	}
 }
 
@@ -2898,6 +3019,168 @@ tabList.addEventListener("click", (event) => {
 document.getElementById("new-tab").addEventListener("click", createTab);
 document.getElementById("games-open").addEventListener("click", showGamesPage);
 document.getElementById("games-home").addEventListener("click", goHome);
+const themeParticlePointer = { x: -1, y: -1, active: false };
+let themeParticleFrame = 0;
+const themeParticleNetworks = themeParticleCanvases.map((canvas) => ({
+	canvas,
+	context: canvas.getContext("2d"),
+	width: 0,
+	height: 0,
+	ratio: 1,
+	points: [],
+}));
+
+function resizeThemeParticleNetwork(network) {
+	const bounds = network.canvas.getBoundingClientRect();
+	if (!bounds.width || !bounds.height) return false;
+	if (network.width === bounds.width && network.height === bounds.height) {
+		return true;
+	}
+	network.width = bounds.width;
+	network.height = bounds.height;
+	network.ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+	network.canvas.width = Math.round(bounds.width * network.ratio);
+	network.canvas.height = Math.round(bounds.height * network.ratio);
+	network.context.setTransform(
+		network.ratio,
+		0,
+		0,
+		network.ratio,
+		0,
+		0
+	);
+	const count = Math.max(
+		48,
+		Math.min(180, Math.round((bounds.width * bounds.height) / 9500))
+	);
+	network.points = Array.from({ length: count }, () => ({
+		x: Math.random() * bounds.width,
+		y: Math.random() * bounds.height,
+		vx: (Math.random() - 0.5) * 0.8,
+		vy: (Math.random() - 0.5) * 0.8,
+	}));
+	return true;
+}
+
+function getThemeParticleColor(canvas) {
+	const accent = getComputedStyle(canvas)
+		.getPropertyValue("--accent")
+		.trim();
+	const match = accent.match(/^#([\da-f]{6})$/i);
+	if (!match) return "196, 232, 121";
+	const value = Number.parseInt(match[1], 16);
+	return `${value >> 16}, ${(value >> 8) & 255}, ${value & 255}`;
+}
+
+function drawThemeParticleNetwork(network, timestamp) {
+	if (!network.context || !resizeThemeParticleNetwork(network)) return false;
+	const { canvas, context, points, width, height } = network;
+	const bounds = canvas.getBoundingClientRect();
+	const color = getThemeParticleColor(canvas);
+	const cursorX = themeParticlePointer.x - bounds.left;
+	const cursorY = themeParticlePointer.y - bounds.top;
+	const cursorVisible =
+		themeParticlePointer.active &&
+		cursorX >= 0 &&
+		cursorY >= 0 &&
+		cursorX <= width &&
+		cursorY <= height;
+	context.clearRect(0, 0, width, height);
+
+	for (const point of points) {
+		if (!prefersReducedMotion.matches) {
+			if (cursorVisible) {
+				const dx = point.x - cursorX;
+				const dy = point.y - cursorY;
+				const distance = Math.hypot(dx, dy);
+				if (distance > 0 && distance < 160) {
+					const force = ((160 - distance) / 160) * 0.065;
+					point.vx += (dx / distance) * force;
+					point.vy += (dy / distance) * force;
+				}
+			}
+			point.x += point.vx;
+			point.y += point.vy;
+			point.vx *= 0.999;
+			point.vy *= 0.999;
+			point.x = (point.x + width) % width;
+			point.y = (point.y + height) % height;
+		}
+	}
+
+	for (let index = 0; index < points.length; index++) {
+		const point = points[index];
+		for (let nextIndex = index + 1; nextIndex < points.length; nextIndex++) {
+			const next = points[nextIndex];
+			const distance = Math.hypot(point.x - next.x, point.y - next.y);
+			if (distance > 128) continue;
+			const proximity =
+				cursorVisible &&
+				Math.hypot(
+					(point.x + next.x) / 2 - cursorX,
+					(point.y + next.y) / 2 - cursorY
+				) < 150;
+			const opacity = (1 - distance / 128) * (proximity ? 0.28 : 0.16);
+			context.strokeStyle = `rgba(${color}, ${opacity})`;
+			context.lineWidth = proximity ? 1 : 0.7;
+			context.beginPath();
+			context.moveTo(point.x, point.y);
+			context.lineTo(next.x, next.y);
+			context.stroke();
+		}
+		context.fillStyle = `rgba(${color}, ${cursorVisible ? 0.78 : 0.58})`;
+		context.beginPath();
+		context.arc(point.x, point.y, 1.55, 0, Math.PI * 2);
+		context.fill();
+	}
+	return true;
+}
+
+function renderThemeParticles(timestamp = 0) {
+	themeParticleFrame = 0;
+	let hasVisibleCanvas = false;
+	for (const network of themeParticleNetworks) {
+		hasVisibleCanvas =
+			drawThemeParticleNetwork(network, timestamp) || hasVisibleCanvas;
+	}
+	if (hasVisibleCanvas && !prefersReducedMotion.matches) {
+		themeParticleFrame = window.requestAnimationFrame(renderThemeParticles);
+	}
+}
+
+function requestThemeParticleRender() {
+	if (!themeParticleFrame) {
+		themeParticleFrame = window.requestAnimationFrame(renderThemeParticles);
+	}
+}
+
+browserStage.addEventListener("pointermove", (event) => {
+	if (event.pointerType === "touch") return;
+	themeParticlePointer.x = event.clientX;
+	themeParticlePointer.y = event.clientY;
+	themeParticlePointer.active = true;
+	browserStage.classList.toggle(
+		"has-pointer",
+		!prefersReducedMotion.matches
+	);
+	requestThemeParticleRender();
+});
+browserStage.addEventListener("pointerleave", () => {
+	themeParticlePointer.active = false;
+	browserStage.classList.remove("has-pointer");
+	requestThemeParticleRender();
+});
+prefersReducedMotion.addEventListener("change", (event) => {
+	if (event.matches) {
+		browserStage.classList.remove("has-pointer");
+		if (themeParticleFrame) {
+			window.cancelAnimationFrame(themeParticleFrame);
+			themeParticleFrame = 0;
+		}
+	}
+	requestThemeParticleRender();
+});
+window.addEventListener("resize", requestThemeParticleRender);
 document.querySelector(".game-providers").addEventListener("click", (event) => {
 	const provider = event.target.closest("[data-game-url]");
 	if (!provider) return;
@@ -2910,11 +3193,28 @@ gameGrid.addEventListener("click", (event) => {
 	const url = safeMediaUrl(card.dataset.gameUrl);
 	if (url) void navigateTab(activeTab(), url);
 });
-document.getElementById("games-search").addEventListener("input", renderGames);
+for (const image of document.querySelectorAll(".game-provider-favicon img")) {
+	image.addEventListener("error", () => (image.hidden = true), { once: true });
+	if (image.complete && !image.naturalWidth) image.hidden = true;
+}
+function resetGameLimitAndRender() {
+	visibleGameLimit = GAME_CATALOG_PAGE_SIZE;
+	renderGames();
+}
+
+document
+	.getElementById("games-search")
+	.addEventListener("input", resetGameLimitAndRender);
 document
 	.getElementById("games-category")
-	.addEventListener("change", renderGames);
-document.getElementById("games-sort").addEventListener("change", renderGames);
+	.addEventListener("change", resetGameLimitAndRender);
+document
+	.getElementById("games-sort")
+	.addEventListener("change", resetGameLimitAndRender);
+document.getElementById("games-more").addEventListener("click", () => {
+	visibleGameLimit += GAME_CATALOG_PAGE_SIZE;
+	renderGames();
+});
 document
 	.getElementById("games-refresh")
 	.addEventListener("click", () => void loadGameCatalog(true));
@@ -3395,8 +3695,41 @@ document
 	.getElementById("quick-links-filter")
 	.addEventListener("input", filterQuickLinks);
 
+function matchesFullscreenExitShortcut(event) {
+	if (!document.fullscreenElement || event.repeat || event.isComposing)
+		return false;
+	if (
+		event.target instanceof Element &&
+		event.target.closest("input, textarea, select, [contenteditable='true']")
+	) {
+		return false;
+	}
+	const key = event.key.toLowerCase();
+	if (userSettings.fullscreenExitShortcut === "ctrl-shift-f") {
+		return (
+			key === "f" &&
+			(event.ctrlKey || event.metaKey) &&
+			event.shiftKey &&
+			!event.altKey
+		);
+	}
+	return (
+		userSettings.fullscreenExitShortcut === "alt-enter" &&
+		key === "enter" &&
+		event.altKey &&
+		!event.ctrlKey &&
+		!event.metaKey &&
+		!event.shiftKey
+	);
+}
+
 document.addEventListener("keydown", (event) => {
 	const key = typeof event.key === "string" ? event.key : "";
+	if (matchesFullscreenExitShortcut(event)) {
+		event.preventDefault();
+		void toggleFullscreen();
+		return;
+	}
 	if (key.startsWith("Arrow")) {
 		if (key === arrowSequence[arrowSequenceIndex]) {
 			arrowSequenceIndex++;

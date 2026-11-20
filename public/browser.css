@@ -63,8 +63,28 @@ select,
 textarea {
 	font: inherit;
 }
+input,
+select,
+textarea {
+	accent-color: var(--accent);
+	color-scheme: dark;
+}
+select {
+	appearance: none;
+}
+select option {
+	background: var(--chrome);
+	color: var(--text);
+}
 button {
 	color: inherit;
+}
+button:disabled {
+	opacity: 0.58;
+	cursor: not-allowed;
+}
+button:disabled:hover {
+	transform: none;
 }
 button:focus-visible,
 input:focus-visible,
@@ -568,8 +588,20 @@ textarea:focus-visible {
 	display: none;
 }
 .games-content {
+	position: relative;
+	z-index: 2;
 	width: min(1120px, 100%);
 	margin: 0 auto;
+}
+.theme-particles {
+	position: absolute;
+	z-index: 1;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	mix-blend-mode: screen;
+	opacity: 0.62;
 }
 .games-header,
 .game-catalog-heading {
@@ -628,21 +660,28 @@ textarea:focus-visible {
 	outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
 	outline-offset: 2px;
 }
-.game-provider-icon {
+.game-provider > span:nth-child(2) {
+	min-width: 0;
+	display: grid;
+	gap: 4px;
+}
+.game-provider-favicon {
 	width: 42px;
 	height: 42px;
 	flex: 0 0 42px;
 	display: grid;
 	place-items: center;
-	border-radius: 10px;
-	background: var(--home-icon);
-	color: var(--accent);
-	font-weight: 700;
+	border: 1px solid var(--home-card-border);
+	border-radius: 12px;
+	background: var(--home-card);
 }
-.game-provider > span:nth-child(2) {
-	min-width: 0;
-	display: grid;
-	gap: 4px;
+.game-provider-favicon img {
+	width: 32px;
+	height: 32px;
+	object-fit: contain;
+}
+.game-provider-favicon img[hidden] {
+	display: none;
 }
 .game-provider strong {
 	font-size: 0.94rem;
@@ -731,10 +770,22 @@ textarea:focus-visible {
 }
 .game-filter select {
 	cursor: pointer;
+	padding-right: 25px;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23aab6ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right center;
+	color-scheme: dark;
 }
 .game-filter option {
-	background: var(--surface);
+	background: var(--home-card);
 	color: var(--text);
+}
+.game-filter:focus-within {
+	outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+	outline-offset: 2px;
+}
+.game-filter select:focus-visible {
+	outline: none;
 }
 .game-grid {
 	display: grid;
@@ -788,6 +839,14 @@ textarea:focus-visible {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+.games-more {
+	display: block;
+	min-width: 180px;
+	margin: 20px auto 0;
+}
+.games-more[hidden] {
+	display: none;
+}
 .game-catalog-note,
 .games-empty,
 .games-error {
@@ -798,28 +857,6 @@ textarea:focus-visible {
 }
 .games-error {
 	color: #ff9a8b;
-}
-.backup-section {
-	margin-top: 24px;
-	padding-top: 20px;
-	border-top: 1px solid var(--line);
-}
-.backup-section h3 {
-	margin: 0;
-	font-size: 1rem;
-}
-.backup-section > p {
-	color: var(--muted);
-	font-size: 0.82rem;
-	line-height: 1.5;
-}
-.backup-section > label {
-	display: block;
-	margin: 14px 0 6px;
-	font-size: 0.82rem;
-}
-.backup-section > input {
-	width: 100%;
 }
 .backup-actions {
 	display: flex;
@@ -1119,6 +1156,10 @@ textarea:focus-visible {
 	border-top: 1px solid
 		color-mix(in srgb, var(--home-card-border), var(--home-muted) 24%);
 }
+.home-footer,
+.games-content {
+	z-index: 2;
+}
 .home-notice {
 	max-width: 900px;
 	margin: 13px auto 0;
@@ -1155,7 +1196,6 @@ textarea:focus-visible {
 	width: min(620px, calc(100vw - 28px));
 	max-height: calc(100dvh - 24px);
 	overflow: auto;
-	font-family: "Comfortaa", "Inter", sans-serif;
 	scrollbar-color: var(--line) transparent;
 }
 #admin-dialog .dialog-heading {
@@ -1163,19 +1203,11 @@ textarea:focus-visible {
 	margin-bottom: 16px;
 }
 #admin-dialog .dialog-heading h2 {
-	font-family: "Comfortaa", "Inter", sans-serif;
 	font-size: 1.55rem;
 	letter-spacing: -0.035em;
 }
 #admin-dialog .dialog-kicker {
 	font-size: 0.62rem;
-}
-#admin-dialog .dialog-primary,
-#admin-dialog .dialog-secondary,
-#admin-dialog input,
-#admin-dialog select,
-#admin-dialog textarea {
-	font-family: "Comfortaa", "Inter", sans-serif;
 }
 #admin-dialog #admin-login-form {
 	max-width: 380px;
@@ -1225,6 +1257,9 @@ textarea:focus-visible {
 	margin-top: 16px;
 	padding-top: 16px;
 	border-top: 1px solid var(--line);
+}
+.admin-overview .admin-status-grid {
+	margin: 12px 0 0;
 }
 .admin-section-heading {
 	display: flex;
@@ -1335,11 +1370,13 @@ textarea:focus-visible {
 	min-height: 76px;
 }
 .admin-section-actions {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+	padding-bottom: 4px;
+}
+.admin-section-actions > .admin-actions {
+	justify-content: flex-start;
 }
 .admin-section-actions .dialog-secondary {
+	width: auto;
 	margin-top: 0;
 }
 .utility-dialog[open] {
@@ -1446,7 +1483,7 @@ textarea:focus-visible {
 	overflow-wrap: anywhere;
 }
 .user-settings-dialog {
-	max-height: calc(100vh - 24px);
+	max-height: calc(100dvh - 24px);
 	overflow: auto;
 }
 #user-settings-close[hidden] {
@@ -1707,6 +1744,119 @@ textarea:focus-visible {
 	border-radius: 7px;
 	background: var(--chrome-raised);
 	cursor: pointer;
+}
+.settings-section {
+	margin-top: 10px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: linear-gradient(145deg, var(--chrome-raised), var(--chrome));
+	overflow: clip;
+}
+.settings-section > summary {
+	min-height: 58px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 11px 15px;
+	cursor: pointer;
+	list-style: none;
+}
+.settings-section > summary::-webkit-details-marker {
+	display: none;
+}
+.settings-section > summary::after {
+	width: 8px;
+	height: 8px;
+	flex: 0 0 8px;
+	border-right: 1.5px solid var(--muted);
+	border-bottom: 1.5px solid var(--muted);
+	content: "";
+	transform: rotate(45deg) translateY(-2px);
+	transition: transform 160ms ease;
+}
+.settings-section[open] > summary::after {
+	transform: rotate(225deg) translateY(-2px);
+}
+.settings-section > summary:focus-visible {
+	outline-offset: -3px;
+}
+.settings-section > summary > span,
+.settings-section > summary[id] {
+	color: var(--text);
+	font-size: 0.84rem;
+	font-weight: 700;
+}
+.settings-section > summary > small {
+	margin-left: auto;
+	color: var(--muted);
+	font-size: 0.72rem;
+	text-align: right;
+}
+.settings-section-content {
+	padding: 2px 15px 15px;
+	border-top: 1px solid var(--line);
+}
+.settings-section-content
+	input:is([type="text"], [type="url"], [type="password"]),
+.settings-section-content select {
+	width: 100%;
+	min-height: 42px;
+	margin: 0 0 14px;
+	padding: 0 12px;
+	border: 1px solid color-mix(in srgb, var(--line), var(--text) 6%);
+	border-radius: 9px;
+	background-color: var(--field);
+	color: var(--field-text);
+}
+.settings-section-content > label {
+	display: block;
+	margin: 13px 0 7px;
+	color: var(--text);
+	font-size: 0.78rem;
+	font-weight: 600;
+}
+.settings-section > summary:hover {
+	background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.settings-section-content .file-picker {
+	margin-bottom: 12px;
+}
+.settings-section-content .background-image-preview-row {
+	margin: -2px 0 12px;
+}
+.settings-section-content .theme-colors {
+	margin-top: 0;
+}
+.settings-section-content .setting-row {
+	margin-bottom: 0;
+}
+.settings-section-content .theme-help {
+	margin: -7px 0 4px;
+}
+.backup-section {
+	margin-top: 10px;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: linear-gradient(145deg, var(--chrome-raised), var(--chrome));
+}
+.backup-section .settings-section-content > p {
+	color: var(--muted);
+	font-size: 0.78rem;
+	line-height: 1.5;
+}
+.backup-section .settings-section-content > label {
+	margin-top: 14px;
+}
+.backup-section input[type="password"] {
+	margin-bottom: 0;
+}
+.backup-section .backup-actions {
+	margin-top: 12px;
+}
+.backup-section .dialog-message {
+	margin-bottom: 0;
 }
 .theme-help {
 	display: block;
