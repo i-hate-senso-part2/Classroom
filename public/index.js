@@ -95,6 +95,9 @@ let seenAnnouncementId = (() => {
 })();
 const fullscreenToggle = document.getElementById("fullscreen-toggle");
 const fullscreenExit = document.getElementById("fullscreen-exit");
+const fullscreenHint =
+	"Escape stays available to games. Use your Chromebook's fullscreen key to hide browser controls.";
+let immersiveFullscreen = false;
 const picker = document.querySelector(".engine-picker");
 const trigger = document.querySelector(".engine-trigger");
 const menu = document.querySelector(".engine-menu");
@@ -3426,23 +3429,32 @@ document
 		backgroundVideoError = "";
 	});
 
-async function updateFullscreenState() {
-	const isFullscreen = Boolean(document.fullscreenElement);
+function updateFullscreenState() {
+	const isFullscreen = Boolean(document.fullscreenElement || immersiveFullscreen);
+	document.documentElement.classList.toggle(
+		"immersive-fullscreen",
+		immersiveFullscreen
+	);
 	fullscreenExit.hidden = !isFullscreen;
 	fullscreenToggle.setAttribute("aria-pressed", String(isFullscreen));
 	fullscreenToggle.setAttribute(
 		"aria-label",
-		`${isFullscreen ? "Exit" : "Enter"} full screen`
+		`${isFullscreen ? "Exit" : "Enter"} immersive view`
 	);
-	fullscreenToggle.title = `${isFullscreen ? "Exit" : "Enter"} full screen`;
+	fullscreenToggle.title = `${isFullscreen ? "Exit" : "Enter"} immersive view. ${fullscreenHint}`;
+	fullscreenExit.title = `Exit immersive view. ${fullscreenHint}`;
 }
 
 async function toggleFullscreen() {
 	try {
-		if (document.fullscreenElement) await document.exitFullscreen();
-		else await document.documentElement.requestFullscreen();
+		if (document.fullscreenElement) {
+			await document.exitFullscreen();
+		} else {
+			immersiveFullscreen = !immersiveFullscreen;
+			updateFullscreenState();
+		}
 	} catch (error) {
-		showError("Full screen is unavailable in this browser.", error.message);
+		showError("Unable to exit full screen.", error.message);
 	}
 }
 
@@ -3696,7 +3708,11 @@ document
 	.addEventListener("input", filterQuickLinks);
 
 function matchesFullscreenExitShortcut(event) {
-	if (!document.fullscreenElement || event.repeat || event.isComposing)
+	if (
+		!(document.fullscreenElement || immersiveFullscreen) ||
+		event.repeat ||
+		event.isComposing
+	)
 		return false;
 	if (
 		event.target instanceof Element &&

@@ -2090,12 +2090,15 @@ textarea:focus-visible {
 	stroke-linejoin: round;
 }
 html:fullscreen,
-html:fullscreen body {
+html:fullscreen body,
+html.immersive-fullscreen,
+html.immersive-fullscreen body {
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
 }
-html:fullscreen .browser-app {
+html:fullscreen .browser-app,
+html.immersive-fullscreen .browser-app {
 	position: fixed;
 	inset: 0;
 	width: 100vw;
@@ -2103,10 +2106,12 @@ html:fullscreen .browser-app {
 	min-height: 0;
 	grid-template-rows: minmax(0, 1fr);
 }
-html:fullscreen .browser-chrome {
+html:fullscreen .browser-chrome,
+html.immersive-fullscreen .browser-chrome {
 	display: none;
 }
-html:fullscreen .browser-stage {
+html:fullscreen .browser-stage,
+html.immersive-fullscreen .browser-stage {
 	grid-row: 1;
 	min-height: 0;
 	height: 100%;

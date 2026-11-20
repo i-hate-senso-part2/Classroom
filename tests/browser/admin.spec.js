@@ -422,6 +422,41 @@ test("fullscreen exit shortcut is configurable in user settings", async ({
 	expect(result).toEqual({ exits: 1, prevented: true });
 });
 
+test("immersive view keeps Escape available to games", async ({ page }) => {
+	await useReturningUserSettings(page);
+	await page.goto(baseUrl);
+	await page.evaluate(() => {
+		let calls = 0;
+		document.documentElement.requestFullscreen = async () => {
+			calls++;
+		};
+		window.__fullscreenRequestCount = () => calls;
+	});
+
+	await page.locator("#fullscreen-toggle").click();
+	await expect(page.locator("html")).toHaveClass(/immersive-fullscreen/);
+	expect(
+		await page.evaluate(() => ({
+			nativeFullscreen: Boolean(document.fullscreenElement),
+			requestCalls: window.__fullscreenRequestCount(),
+		}))
+	).toEqual({ nativeFullscreen: false, requestCalls: 0 });
+
+	await page.evaluate(() => {
+		document.dispatchEvent(
+			new KeyboardEvent("keydown", {
+				key: "Escape",
+				bubbles: true,
+				cancelable: true,
+			})
+		);
+	});
+	await expect(page.locator("html")).toHaveClass(/immersive-fullscreen/);
+
+	await page.locator("#fullscreen-exit").click();
+	await expect(page.locator("html")).not.toHaveClass(/immersive-fullscreen/);
+});
+
 test("encrypted local backup restores Classroom preferences and proxy cookies", async ({
 	page,
 }) => {
